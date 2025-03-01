@@ -14,10 +14,10 @@ const sequelize = new Sequelize(
     pool: {
       max: 5,
       min: 0,
-      qcquire: 30000,
+      acquire: 30000,
       idle: 10000,
     },
   }
 );
 
-module.export = sequelize;
+module.exports = sequelize;
