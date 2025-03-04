@@ -1,6 +1,9 @@
 // src/services/llm/generators/storyGenerator.js
 import { callLLM } from "../../api/index.js";
-import { gamePrompts } from "../prompt/index.js";
+import {
+  generateInitialUserPrompt,
+  generateContinuationUserPrompt,
+} from "../prompt/gamePrompts.js";
 import { gameParser } from "../parser/index.js";
 import { getRecommendedModel } from "../modelManager.js";
 import { STORY_SYSTEM_PROMPT } from "../../config/systemPrompts.js";
@@ -18,13 +21,20 @@ export async function generateInitialSegment(game, character, options = {}) {
     const provider = options.provider || DEFAULT_PROVIDER;
     const modelId = options.modelId || getRecommendedModel("story", provider);
 
-    const prompt = gamePrompts.generateInitialPrompt(game, character);
+    // Generate the user prompt
+    const userPrompt = generateInitialUserPrompt(game, character);
 
-    const response = await callLLM(prompt, STORY_SYSTEM_PROMPT, {
-      provider,
-      modelId,
-      apiKey: options.apiKey,
-    });
+    // Call LLM with separated system prompt and user prompt
+    const response = await callLLM(
+      userPrompt, // User prompt (specific request)
+      STORY_SYSTEM_PROMPT, // System prompt (role and format)
+      {
+        provider,
+        modelId,
+        apiKey: options.apiKey,
+        requireJson: true,
+      }
+    );
 
     return gameParser.parseStoryResponse(response);
   } catch (error) {
@@ -51,17 +61,24 @@ export async function generateContinuation(
     const provider = options.provider || DEFAULT_PROVIDER;
     const modelId = options.modelId || getRecommendedModel("story", provider);
 
-    const prompt = gamePrompts.generateContinuationPrompt(
+    // Generate the user prompt
+    const userPrompt = generateContinuationUserPrompt(
       context,
       chosenOption,
       shouldEnd
     );
 
-    const response = await callLLM(prompt, STORY_SYSTEM_PROMPT, {
-      provider,
-      modelId,
-      apiKey: options.apiKey,
-    });
+    // Call LLM with separated system prompt and user prompt
+    const response = await callLLM(
+      userPrompt, // User prompt (specific request)
+      STORY_SYSTEM_PROMPT, // System prompt (role and format)
+      {
+        provider,
+        modelId,
+        apiKey: options.apiKey,
+        requireJson: true,
+      }
+    );
 
     return gameParser.parseStoryResponse(response, shouldEnd);
   } catch (error) {

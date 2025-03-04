@@ -2,6 +2,10 @@
 import prisma from "../config/db.js";
 import assembleContext from "../services/contextService.js";
 import { llmService } from "../services/index.js";
+import {
+  findSimilarEntityInDb,
+  normalizeEntityName,
+} from "../utils/entityUtils.js";
 
 // Utility function to determine if a story should end
 function shouldEndStory(game) {
@@ -49,6 +53,135 @@ function determineNarrativeStage(game) {
   }
 
   return narrativeStage;
+}
+
+/**
+ * Process new game items with duplicate detection
+ * @param {number} gameId - Game ID
+ * @param {Array} newItems - New items from story generation
+ * @param {number} turnCount - Current turn count
+ * @returns {Promise<Array>} - Array of created or updated items
+ */
+async function processNewItems(gameId, newItems, turnCount) {
+  if (!newItems || !newItems.length) return [];
+
+  const results = [];
+
+  for (const item of newItems) {
+    // Skip items with no name
+    if (!item.name || item.name.trim() === "") continue;
+
+    // Find similar item
+    const similarItem = await findSimilarEntityInDb(
+      prisma,
+      gameId,
+      "item",
+      item.name,
+      0.85
+    );
+
+    if (similarItem) {
+      // Update existing item if needed
+      // This might involve enhancing description or marking it as reappearing
+      const updatedItem = await prisma.gameItem.update({
+        where: { id: similarItem.id },
+        data: {
+          // Only update description if the new one is longer/more detailed
+          description:
+            item.description &&
+            (!similarItem.description ||
+              item.description.length > similarItem.description.length)
+              ? item.description
+              : undefined,
+          // Update other properties as needed
+        },
+      });
+
+      results.push(updatedItem);
+    } else {
+      // Create new item
+      const newItem = await prisma.gameItem.create({
+        data: {
+          gameId: Number(gameId),
+          name: item.name.trim(),
+          description: item.description ? item.description.trim() : null,
+          acquiredAt: turnCount,
+          properties: {},
+        },
+      });
+
+      results.push(newItem);
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Process new game characters with duplicate detection
+ * @param {number} gameId - Game ID
+ * @param {Array} newCharacters - New characters from story generation
+ * @param {number} turnCount - Current turn count
+ * @returns {Promise<Array>} - Array of created or updated characters
+ */
+async function processNewCharacters(gameId, newCharacters, turnCount) {
+  if (!newCharacters || !newCharacters.length) return [];
+
+  const results = [];
+
+  for (const character of newCharacters) {
+    // Skip characters with no name
+    if (!character.name || character.name.trim() === "") continue;
+
+    // Find similar character
+    const similarCharacter = await findSimilarEntityInDb(
+      prisma,
+      gameId,
+      "character",
+      character.name,
+      0.85
+    );
+
+    if (similarCharacter) {
+      // Update existing character
+      const updatedCharacter = await prisma.gameCharacter.update({
+        where: { id: similarCharacter.id },
+        data: {
+          // Only update description if the new one is longer/more detailed
+          description:
+            character.description &&
+            (!similarCharacter.description ||
+              character.description.length >
+                similarCharacter.description.length)
+              ? character.description
+              : undefined,
+          relationship: character.relationship || undefined,
+          lastAppearedAt: turnCount,
+        },
+      });
+
+      results.push(updatedCharacter);
+    } else {
+      // Create new character
+      const newCharacter = await prisma.gameCharacter.create({
+        data: {
+          gameId: Number(gameId),
+          name: character.name.trim(),
+          description: character.description
+            ? character.description.trim()
+            : null,
+          relationship: character.relationship || "NEUTRAL",
+          firstAppearedAt: turnCount,
+          lastAppearedAt: turnCount,
+          importance: 5, // Default importance
+        },
+      });
+
+      results.push(newCharacter);
+    }
+  }
+
+  return results;
 }
 
 // Get current story state
@@ -194,43 +327,17 @@ export async function startStory(req, res) {
       },
     });
 
-    // Create any new items mentioned in the initial segment
+    // Process new items with duplicate detection
     if (initialSegment.newItems && initialSegment.newItems.length > 0) {
-      await Promise.all(
-        initialSegment.newItems.map((item) =>
-          prisma.gameItem.create({
-            data: {
-              gameId: Number(gameId),
-              name: item.name,
-              description: item.description || null,
-              acquiredAt: 1, // First turn
-              properties: {},
-            },
-          })
-        )
-      );
+      await processNewItems(gameId, initialSegment.newItems, 1);
     }
 
-    // Create any new characters mentioned in the initial segment
+    // Process new characters with duplicate detection
     if (
       initialSegment.newCharacters &&
       initialSegment.newCharacters.length > 0
     ) {
-      await Promise.all(
-        initialSegment.newCharacters.map((character) =>
-          prisma.gameCharacter.create({
-            data: {
-              gameId: Number(gameId),
-              name: character.name,
-              description: character.description || null,
-              relationship: character.relationship || "neutral",
-              firstAppearedAt: 1, // First turn
-              lastAppearedAt: 1,
-              importance: 5, // Default importance
-            },
-          })
-        )
-      );
+      await processNewCharacters(gameId, initialSegment.newCharacters, 1);
     }
 
     // Update game's lastPlayedAt
@@ -383,60 +490,17 @@ export async function makeChoice(req, res) {
       },
     });
 
-    // Create any new items mentioned
+    // Process new items with duplicate detection
     if (nextSegment.newItems && nextSegment.newItems.length > 0) {
-      await Promise.all(
-        nextSegment.newItems.map((item) =>
-          prisma.gameItem.create({
-            data: {
-              gameId: Number(gameId),
-              name: item.name,
-              description: item.description || null,
-              acquiredAt: updatedTurnCount,
-              properties: {},
-            },
-          })
-        )
-      );
+      await processNewItems(gameId, nextSegment.newItems, updatedTurnCount);
     }
 
-    // Create or update any characters mentioned
+    // Process new characters with duplicate detection
     if (nextSegment.newCharacters && nextSegment.newCharacters.length > 0) {
-      await Promise.all(
-        nextSegment.newCharacters.map(async (character) => {
-          // Check if character already exists
-          const existingCharacter = await prisma.gameCharacter.findFirst({
-            where: {
-              gameId: Number(gameId),
-              name: character.name,
-            },
-          });
-
-          if (existingCharacter) {
-            // Update existing character
-            return prisma.gameCharacter.update({
-              where: { id: existingCharacter.id },
-              data: {
-                lastAppearedAt: updatedTurnCount,
-                relationship:
-                  character.relationship || existingCharacter.relationship,
-              },
-            });
-          } else {
-            // Create new character
-            return prisma.gameCharacter.create({
-              data: {
-                gameId: Number(gameId),
-                name: character.name,
-                description: character.description || null,
-                relationship: character.relationship || "neutral",
-                firstAppearedAt: updatedTurnCount,
-                lastAppearedAt: updatedTurnCount,
-                importance: 5, // Default importance
-              },
-            });
-          }
-        })
+      await processNewCharacters(
+        gameId,
+        nextSegment.newCharacters,
+        updatedTurnCount
       );
     }
 

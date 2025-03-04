@@ -1,52 +1,71 @@
 // src/services/llm/prompt/gamePrompts.js
 
-/**
- * Generates a prompt for creating game title suggestions
- * @param {string} genre - The game genre
- * @returns {string} - Formatted prompt
- */
-export function generateTitlePrompt(genre) {
-  return `
-Generate 5 title suggestions for a ${genre} text adventure game.
-The titles should be evocative, memorable, and fit the ${genre} genre.
-`;
-}
+import genrePromptSystem from "./genrePromptSystem.js";
 
 /**
- * Generates a prompt for the initial story segment
+ * Generates a user prompt for the initial story segment
  * @param {Object} game - Game information
  * @param {Object} character - Character information
- * @returns {string} - Formatted prompt
+ * @returns {string} - Formatted user prompt
  */
-export function generateInitialPrompt(game, character) {
+export function generateInitialUserPrompt(game, character) {
+  // Get genre and stage specific prompt components
+  const genreStagePrompt = genrePromptSystem.createGenreStagePrompt(
+    game.genre,
+    "INTRODUCTION"
+  );
+
   return `
-Generate the opening scene for a new adventure:
+${genreStagePrompt}
+
+GAME DETAILS:
 - Title: "${game.title}"
 - Genre: "${game.genre}"
 - Character: ${character ? character.name : "Anonymous adventurer"}
 ${character ? `- Character traits: ${character.traits.join(", ")}` : ""}
 ${character ? `- Character bio: ${character.bio}` : ""}
 
-Write an engaging opening scene that sets up the adventure and presents the player with their first set of choices. Include a location context.
+Task: Write an engaging opening scene that sets up the adventure and presents the player with their first set of choices. Include a location context.
+
+In this introduction:
+1. Establish the initial setting with sensory details
+2. Introduce the main character's situation
+3. Present an inciting incident or call to adventure
+4. Offer 2-4 meaningful first choices that help establish the character's approach
+
+IMPORTANT: Only introduce new items or characters if they are central to the plot. Most sessions should have few or no new items/characters. Avoid adding background elements as formal items - only include truly interactive objects.
 `;
 }
 
 /**
- * Generates a prompt for story continuation
+ * Generates a user prompt for story continuation
  * @param {Object} context - Game context including story history
  * @param {string} chosenOption - The player's chosen option
  * @param {boolean} shouldEnd - Whether this should be the final segment
- * @returns {string} - Formatted prompt
+ * @returns {string} - Formatted user prompt
  */
-export function generateContinuationPrompt(
+export function generateContinuationUserPrompt(
   context,
   chosenOption,
   shouldEnd = false
 ) {
   const { game, character, storySegments, items, characters } = context;
 
-  // Build story segments section
-  const segmentsText = storySegments
+  // Get the appropriate narrative stage
+  const currentStage = shouldEnd ? "RESOLUTION" : game.narrativeStage;
+
+  // Get genre and stage specific prompt
+  const genreStagePrompt = genrePromptSystem.createGenreStagePrompt(
+    game.genre,
+    currentStage
+  );
+
+  // Build story segments section (only include the most recent segments for context)
+  const relevantSegments = storySegments.slice(
+    0,
+    Math.min(storySegments.length, 3)
+  );
+  const segmentsText = relevantSegments
     .map(
       (segment) =>
         `SEGMENT: ${segment.content}\n` +
@@ -70,11 +89,13 @@ export function generateContinuationPrompt(
       : "No NPCs encountered yet";
 
   return `
+${genreStagePrompt}
+
 GAME CONTEXT:
 - Title: "${game.title}"
 - Genre: "${game.genre}"
 - Turn: ${game.turnCount}
-- Narrative Stage: ${game.narrativeStage}
+- Narrative Stage: ${currentStage}
 
 CHARACTER:
 ${character ? `- Name: ${character.name}` : "- Anonymous adventurer"}
@@ -95,23 +116,80 @@ The player has chosen to: "${chosenOption}"
 ${
   shouldEnd
     ? "IMPORTANT: This is the final segment of the story. Create a satisfying conclusion that wraps up the adventure."
-    : ""
+    : "Continue the story based on the player's choice."
 }
 
-Based on this context and the player's choice, continue the story with a new segment. Include:
+Include in your response:
 1. Narrative continuation (200-400 words)
 2. ${
     shouldEnd
       ? "No choices (this is the end)"
-      : "2-4 meaningful choices for the player"
+      : "2-4 meaningful choices for the player that offer different approaches"
   }
-3. Information about any new items or characters
-4. Current location
+3. The current location
+
+REGARDING ITEMS AND CHARACTERS:
+- DO NOT add new items or characters unless they are directly interacted with or absolutely critical to the plot
+- Most story segments should have empty newItems and newCharacters arrays
+- Background objects mentioned in narration should NOT be added as formal items
+- If the player already has several items, focus on using those rather than introducing new ones
 `;
 }
 
+/**
+ * Generates a user prompt for title suggestions
+ * @param {string} genre - The game genre
+ * @returns {string} - Formatted user prompt
+ */
+export function generateTitleUserPrompt(genre) {
+  // Get genre info
+  const genreInfo = genrePromptSystem.getGenreInfo(genre) || {};
+
+  let prompt = `Create 5 compelling title suggestions for a ${genre} text adventure game.`;
+
+  // Add genre-specific themes if available
+  if (genreInfo?.elements?.themes?.length > 0) {
+    prompt += `\n\nIncorporate themes common to the ${genre} genre such as: ${genreInfo.elements.themes.join(
+      ", "
+    )}.`;
+  }
+
+  // Add genre-specific settings if available
+  if (genreInfo?.elements?.settings?.length > 0) {
+    prompt += `\n\nThe game may take place in settings like: ${genreInfo.elements.settings.join(
+      ", "
+    )}.`;
+  }
+
+  return (
+    prompt +
+    `\n\nEach title should be evocative, memorable, and instantly communicate the ${genre} genre to players.`
+  );
+}
+
+// Updated API call structure
+export function callStoryGeneration(
+  systemPrompt,
+  userPrompt,
+  provider,
+  modelId,
+  apiKey
+) {
+  return callLLM(
+    userPrompt, // User prompt contains specific request
+    systemPrompt, // System prompt contains role and format instructions
+    {
+      provider,
+      modelId,
+      apiKey,
+      requireJson: true,
+    }
+  );
+}
+
 export default {
-  generateTitlePrompt,
-  generateInitialPrompt,
-  generateContinuationPrompt,
+  generateInitialUserPrompt,
+  generateContinuationUserPrompt,
+  generateTitleUserPrompt,
+  callStoryGeneration,
 };

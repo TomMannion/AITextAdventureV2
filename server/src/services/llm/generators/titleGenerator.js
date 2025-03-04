@@ -17,7 +17,8 @@ export async function generateTitles(genre, options = {}) {
     const provider = options.provider || DEFAULT_PROVIDER;
     const modelId = options.modelId || getRecommendedModel("title", provider);
 
-    const prompt = gamePrompts.generateTitlePrompt(genre);
+    // Updated to use the correct function name from gamePrompts
+    const prompt = gamePrompts.generateTitleUserPrompt(genre);
 
     const response = await callLLM(prompt, TITLE_SYSTEM_PROMPT, {
       provider,
