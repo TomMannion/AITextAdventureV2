@@ -1,0 +1,167 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                Int            @id @default(autoincrement())
+  username          String         @unique @db.VarChar(50)
+  email             String         @unique @db.VarChar(100)
+  password          String         @db.VarChar(255)
+  preferredProvider String?        @db.VarChar(50)
+  preferredModel    String?        @db.VarChar(50)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  // Relations
+  characters        Character[]
+  games             Game[]
+  contextConfig     ContextConfig?
+}
+
+model Character {
+  id                Int       @id @default(autoincrement())
+  name              String    @db.VarChar(100)
+  traits            String[]  // Array of character traits
+  bio               String    @db.Text
+  gender            String?   @db.VarChar(20)
+  image             String?   @db.VarChar(255)
+  achievements      Json?     // Stored as JSONB
+  persistentMemories Json?    // Memories spanning multiple games
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  userId            Int
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  games             Game[]
+}
+
+model Game {
+  id               Int            @id @default(autoincrement())
+  title            String         @db.VarChar(100)
+  genre            String         @db.VarChar(50)
+  status           GameStatus     @default(ACTIVE)
+  lastPlayedAt     DateTime       @default(now())
+  turnCount        Int            @default(0)
+  narrativeStage   NarrativeStage @default(INTRODUCTION)
+  minTurns         Int            @default(7)
+  softMaxTurns     Int            @default(18)
+  hardMaxTurns     Int            @default(25)
+  summary          String?        @db.Text
+  endingSummary    Json?          // Detailed ending summary
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  
+  // Relations
+  userId           Int
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  characterId      Int?
+  character        Character?     @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  storySegments    StorySegment[]
+  gameItems        GameItem[]
+  gameCharacters   GameCharacter[]
+}
+
+model StorySegment {
+  id               Int       @id @default(autoincrement())
+  sequenceNumber   Int
+  content          String    @db.Text
+  userChoice       String?   @db.Text  // Player's choice that led here
+  summary          String?   @db.Text  // Condensed segment summary
+  locationContext  String?   @db.VarChar(100)
+  importance       Int       @default(1)  // Relevance ranking (1-10)
+  vectorId         String?   // Vector database reference (optional)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  // Relations
+  gameId           Int
+  game             Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  options          Option[]
+}
+
+model Option {
+  id               Int       @id @default(autoincrement())
+  text             String    @db.Text
+  risk             RiskLevel @default(MEDIUM)
+  wasChosen        Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  // Relations
+  storySegmentId   Int
+  storySegment     StorySegment @relation(fields: [storySegmentId], references: [id], onDelete: Cascade)
+}
+
+model GameItem {
+  id               Int       @id @default(autoincrement())
+  name             String    @db.VarChar(100)
+  description      String?   @db.Text
+  acquiredAt       Int       // Turn number when acquired
+  lostAt           Int?      // Turn number when lost (if applicable)
+  properties       Json?     // Additional item properties
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  // Relations
+  gameId           Int
+  game             Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+}
+
+model GameCharacter {
+  id               Int       @id @default(autoincrement())
+  name             String    @db.VarChar(100)
+  description      String?   @db.Text
+  relationship     String    @default("neutral") @db.VarChar(50)
+  firstAppearedAt  Int       // Turn number of first appearance
+  lastAppearedAt   Int?      // Turn number of last appearance
+  importance       Int       @default(5)  // Character importance (1-10)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  // Relations
+  gameId           Int
+  game             Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+}
+
+model ContextConfig {
+  id               Int       @id @default(autoincrement())
+  maxSegments      Int       @default(5)  // Max story segments in context
+  includeItems     Boolean   @default(true)
+  includeCharacters Boolean  @default(true)
+  maxItems         Int       @default(10)
+  maxCharacters    Int       @default(5)
+  useVectorSearch  Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  // Relations
+  userId           Int       @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum GameStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
+
+enum NarrativeStage {
+  INTRODUCTION
+  RISING_ACTION
+  CLIMAX
+  FALLING_ACTION
+  RESOLUTION
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
