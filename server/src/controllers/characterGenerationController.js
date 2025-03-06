@@ -26,12 +26,12 @@ export async function generateNames(req, res) {
 
     // Set up options for LLM service
     const options = {
-      provider:
-        user?.preferredProvider || process.env.DEFAULT_LLM_PROVIDER || "openai",
-      modelId: user?.preferredModel,
+      provider: req.body.preferredProvider || "groq",
+      modelId: req.body.preferredModel || "llama-3.1-8b-instant",
       apiKey: req.headers["x-llm-api-key"],
     };
 
+    console.log(options);
     // Generate names with options object
     const names = await llmService.generateCharacterNames(
       genre,
@@ -75,10 +75,10 @@ export async function generateTraits(req, res) {
     });
 
     // Set up options for LLM service
+    // Set up options for LLM service
     const options = {
-      provider:
-        user?.preferredProvider || process.env.DEFAULT_LLM_PROVIDER || "openai",
-      modelId: user?.preferredModel,
+      provider: req.body.preferredProvider || "groq",
+      modelId: req.body.preferredModel || "llama-3.1-8b-instant",
       apiKey: req.headers["x-llm-api-key"],
     };
 
@@ -126,10 +126,10 @@ export async function generateBios(req, res) {
     });
 
     // Set up options for LLM service
+    // Set up options for LLM service
     const options = {
-      provider:
-        user?.preferredProvider || process.env.DEFAULT_LLM_PROVIDER || "openai",
-      modelId: user?.preferredModel,
+      provider: req.body.preferredProvider || "groq",
+      modelId: req.body.preferredModel || "llama-3.1-8b-instant",
       apiKey: req.headers["x-llm-api-key"],
     };
 
@@ -178,10 +178,10 @@ export async function generateRandomCharacter(req, res) {
     });
 
     // Set up options for LLM service
+    // Set up options for LLM service
     const options = {
-      provider:
-        user?.preferredProvider || process.env.DEFAULT_LLM_PROVIDER || "openai",
-      modelId: user?.preferredModel,
+      provider: req.body.preferredProvider || "groq",
+      modelId: req.body.preferredModel || "llama-3.1-8b-instant",
       apiKey: req.headers["x-llm-api-key"],
     };
 

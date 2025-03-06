@@ -68,6 +68,21 @@ model Game {
   gameCharacters   GameCharacter[]
 }
 
+model EntityMention {
+  id               Int       @id @default(autoincrement())
+  entityType       String    @db.VarChar(20)  // "character" or "item"
+  entityId         Int       // ID of the character or item
+  segmentId        Int       // ID of the story segment
+  mentionCount     Int       @default(1)
+  context          String?   @db.Text  // Snippet of text containing the mention
+  stateChange      Boolean   @default(false)  // Was there a state change in this mention?
+  newState         String?   @db.VarChar(50)  // New state (if applicable)
+  createdAt        DateTime  @default(now())
+  
+  // Relations
+  storySegment     StorySegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+}
+
 model StorySegment {
   id               Int       @id @default(autoincrement())
   sequenceNumber   Int
@@ -84,6 +99,7 @@ model StorySegment {
   gameId           Int
   game             Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
   options          Option[]
+  entityMentions   EntityMention[]
 }
 
 model Option {
@@ -106,6 +122,10 @@ model GameItem {
   acquiredAt       Int       // Turn number when acquired
   lostAt           Int?      // Turn number when lost (if applicable)
   properties       Json?     // Additional item properties
+  currentState     String    @default("default") @db.VarChar(50) // Current state (default, broken, consumed, etc.)
+  canonicalId      String?   @db.VarChar(100)    // For linking different representations of the same item
+  stateHistory     Json?     // Array of state changes with timestamps
+  lastMentionedAt  Int?      // Last turn the item was mentioned
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   
@@ -118,16 +138,24 @@ model GameCharacter {
   id               Int       @id @default(autoincrement())
   name             String    @db.VarChar(100)
   description      String?   @db.Text
-  relationship     String    @default("neutral") @db.VarChar(50)
+  relationship     String    @default("NEUTRAL") @db.VarChar(50)
   firstAppearedAt  Int       // Turn number of first appearance
   lastAppearedAt   Int?      // Turn number of last appearance
+  lastMentionedAt  Int?      // Last turn the character was mentioned
   importance       Int       @default(5)  // Character importance (1-10)
+  canonicalId      String?   @db.VarChar(100)  // For linking different representations of the same character
+  aliases          String[]  // Array of alternative names/identities
+  stateHistory     Json?     // Array of state/relationship changes with timestamps
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   
   // Relations
   gameId           Int
   game             Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  // Self-relation for identity reveals/relationships
+  originalCharacterId Int?
+  originalCharacter   GameCharacter?  @relation("CharacterIdentities", fields: [originalCharacterId], references: [id])
+  revealedIdentities  GameCharacter[] @relation("CharacterIdentities")
 }
 
 model ContextConfig {

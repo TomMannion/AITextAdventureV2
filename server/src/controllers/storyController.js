@@ -2,10 +2,7 @@
 import prisma from "../config/db.js";
 import assembleContext from "../services/contextService.js";
 import { llmService } from "../services/index.js";
-import {
-  findSimilarEntityInDb,
-  normalizeEntityName,
-} from "../utils/entityUtils.js";
+import entityProcessor from "../services/entityProcessor.js";
 
 // Utility function to determine if a story should end
 function shouldEndStory(game) {
@@ -53,135 +50,6 @@ function determineNarrativeStage(game) {
   }
 
   return narrativeStage;
-}
-
-/**
- * Process new game items with duplicate detection
- * @param {number} gameId - Game ID
- * @param {Array} newItems - New items from story generation
- * @param {number} turnCount - Current turn count
- * @returns {Promise<Array>} - Array of created or updated items
- */
-async function processNewItems(gameId, newItems, turnCount) {
-  if (!newItems || !newItems.length) return [];
-
-  const results = [];
-
-  for (const item of newItems) {
-    // Skip items with no name
-    if (!item.name || item.name.trim() === "") continue;
-
-    // Find similar item
-    const similarItem = await findSimilarEntityInDb(
-      prisma,
-      gameId,
-      "item",
-      item.name,
-      0.85
-    );
-
-    if (similarItem) {
-      // Update existing item if needed
-      // This might involve enhancing description or marking it as reappearing
-      const updatedItem = await prisma.gameItem.update({
-        where: { id: similarItem.id },
-        data: {
-          // Only update description if the new one is longer/more detailed
-          description:
-            item.description &&
-            (!similarItem.description ||
-              item.description.length > similarItem.description.length)
-              ? item.description
-              : undefined,
-          // Update other properties as needed
-        },
-      });
-
-      results.push(updatedItem);
-    } else {
-      // Create new item
-      const newItem = await prisma.gameItem.create({
-        data: {
-          gameId: Number(gameId),
-          name: item.name.trim(),
-          description: item.description ? item.description.trim() : null,
-          acquiredAt: turnCount,
-          properties: {},
-        },
-      });
-
-      results.push(newItem);
-    }
-  }
-
-  return results;
-}
-
-/**
- * Process new game characters with duplicate detection
- * @param {number} gameId - Game ID
- * @param {Array} newCharacters - New characters from story generation
- * @param {number} turnCount - Current turn count
- * @returns {Promise<Array>} - Array of created or updated characters
- */
-async function processNewCharacters(gameId, newCharacters, turnCount) {
-  if (!newCharacters || !newCharacters.length) return [];
-
-  const results = [];
-
-  for (const character of newCharacters) {
-    // Skip characters with no name
-    if (!character.name || character.name.trim() === "") continue;
-
-    // Find similar character
-    const similarCharacter = await findSimilarEntityInDb(
-      prisma,
-      gameId,
-      "character",
-      character.name,
-      0.85
-    );
-
-    if (similarCharacter) {
-      // Update existing character
-      const updatedCharacter = await prisma.gameCharacter.update({
-        where: { id: similarCharacter.id },
-        data: {
-          // Only update description if the new one is longer/more detailed
-          description:
-            character.description &&
-            (!similarCharacter.description ||
-              character.description.length >
-                similarCharacter.description.length)
-              ? character.description
-              : undefined,
-          relationship: character.relationship || undefined,
-          lastAppearedAt: turnCount,
-        },
-      });
-
-      results.push(updatedCharacter);
-    } else {
-      // Create new character
-      const newCharacter = await prisma.gameCharacter.create({
-        data: {
-          gameId: Number(gameId),
-          name: character.name.trim(),
-          description: character.description
-            ? character.description.trim()
-            : null,
-          relationship: character.relationship || "NEUTRAL",
-          firstAppearedAt: turnCount,
-          lastAppearedAt: turnCount,
-          importance: 5, // Default importance
-        },
-      });
-
-      results.push(newCharacter);
-    }
-  }
-
-  return results;
 }
 
 // Get current story state
@@ -293,10 +161,10 @@ export async function startStory(req, res) {
     });
 
     // Set up options for LLM service
+    // Set up options for LLM service
     const options = {
-      provider:
-        user?.preferredProvider || process.env.DEFAULT_LLM_PROVIDER || "openai",
-      modelId: user?.preferredModel,
+      provider: req.body.preferredProvider || "groq",
+      modelId: req.body.preferredModel || "llama-3.1-8b-instant",
       apiKey: req.headers["x-llm-api-key"],
     };
 
@@ -327,18 +195,24 @@ export async function startStory(req, res) {
       },
     });
 
-    // Process new items with duplicate detection
+    // Process entities using our enhanced processor
     if (initialSegment.newItems && initialSegment.newItems.length > 0) {
-      await processNewItems(gameId, initialSegment.newItems, 1);
+      await entityProcessor.processNewItems(gameId, initialSegment.newItems, 1);
     }
 
-    // Process new characters with duplicate detection
     if (
       initialSegment.newCharacters &&
       initialSegment.newCharacters.length > 0
     ) {
-      await processNewCharacters(gameId, initialSegment.newCharacters, 1);
+      await entityProcessor.processNewCharacters(
+        gameId,
+        initialSegment.newCharacters,
+        1
+      );
     }
+
+    // Process all entities mentioned in the segment
+    // await entityProcessor.processSegmentEntities(gameId, storySegment, 1);
 
     // Update game's lastPlayedAt
     await prisma.game.update({
@@ -451,10 +325,10 @@ export async function makeChoice(req, res) {
     });
 
     // Set up options for LLM service
+    // Set up options for LLM service
     const options = {
-      provider:
-        user?.preferredProvider || process.env.DEFAULT_LLM_PROVIDER || "openai",
-      modelId: user?.preferredModel,
+      provider: req.body.preferredProvider || "groq",
+      modelId: req.body.preferredModel || "llama-3.1-8b-instant",
       apiKey: req.headers["x-llm-api-key"],
     };
 
@@ -490,19 +364,29 @@ export async function makeChoice(req, res) {
       },
     });
 
-    // Process new items with duplicate detection
+    // Process entities using our enhanced processor
     if (nextSegment.newItems && nextSegment.newItems.length > 0) {
-      await processNewItems(gameId, nextSegment.newItems, updatedTurnCount);
+      await entityProcessor.processNewItems(
+        gameId,
+        nextSegment.newItems,
+        updatedTurnCount
+      );
     }
 
-    // Process new characters with duplicate detection
     if (nextSegment.newCharacters && nextSegment.newCharacters.length > 0) {
-      await processNewCharacters(
+      await entityProcessor.processNewCharacters(
         gameId,
         nextSegment.newCharacters,
         updatedTurnCount
       );
     }
+
+    // Process all entities mentioned in the segment
+    // await entityProcessor.processSegmentEntities(
+    //   gameId,
+    //   newSegment,
+    //   updatedTurnCount
+    // );
 
     // Update game state
     await prisma.game.update({
@@ -525,8 +409,133 @@ export async function makeChoice(req, res) {
   }
 }
 
+// Get entity history
+export async function getEntityHistory(req, res) {
+  try {
+    const { gameId, entityType, entityId } = req.params;
+    const userId = req.user.id;
+
+    // Check game ownership
+    const game = await prisma.game.findUnique({
+      where: { id: Number(gameId) },
+    });
+
+    if (!game) {
+      return res.status(404).json({ message: "Game not found" });
+    }
+
+    if (game.userId !== userId) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // Validate entity type
+    if (!["item", "character"].includes(entityType.toLowerCase())) {
+      return res.status(400).json({ message: "Invalid entity type" });
+    }
+
+    // Get entity data based on type
+    let entity;
+
+    if (entityType.toLowerCase() === "item") {
+      entity = await prisma.gameItem.findUnique({
+        where: {
+          id: Number(entityId),
+          gameId: Number(gameId),
+        },
+      });
+    } else {
+      entity = await prisma.gameCharacter.findUnique({
+        where: {
+          id: Number(entityId),
+          gameId: Number(gameId),
+        },
+      });
+    }
+
+    if (!entity) {
+      return res.status(404).json({ message: "Entity not found" });
+    }
+
+    // Get all mentions of this entity
+    const mentions = await prisma.entityMention.findMany({
+      where: {
+        entityType: entityType.toUpperCase(),
+        entityId: Number(entityId),
+      },
+      include: {
+        storySegment: {
+          select: {
+            sequenceNumber: true,
+            content: true,
+            locationContext: true,
+          },
+        },
+      },
+      orderBy: {
+        storySegment: {
+          sequenceNumber: "asc",
+        },
+      },
+    });
+
+    // Get all related entities if this is a character
+    let relatedEntities = [];
+    if (entityType.toLowerCase() === "character") {
+      // Get identities this character has been revealed as
+      const originalIdentities = await prisma.gameCharacter.findMany({
+        where: {
+          originalCharacterId: Number(entityId),
+          gameId: Number(gameId),
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      // Get identities that this character has revealed
+      const revealedIdentity = entity.originalCharacterId
+        ? await prisma.gameCharacter.findUnique({
+            where: {
+              id: entity.originalCharacterId,
+            },
+            select: {
+              id: true,
+              name: true,
+            },
+          })
+        : null;
+
+      relatedEntities = {
+        originalIdentities,
+        revealedIdentity,
+      };
+    }
+
+    // Format and return entity history
+    const history = {
+      entity,
+      stateHistory: entity.stateHistory || [],
+      mentions: mentions.map((mention) => ({
+        segmentNumber: mention.storySegment.sequenceNumber,
+        stateChange: mention.stateChange,
+        newState: mention.newState,
+        context: mention.context,
+        location: mention.storySegment.locationContext,
+      })),
+      relatedEntities,
+    };
+
+    res.json(history);
+  } catch (error) {
+    console.error("Get entity history error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+}
+
 export default {
   getStoryState,
   startStory,
   makeChoice,
+  getEntityHistory,
 };

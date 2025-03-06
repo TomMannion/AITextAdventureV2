@@ -6,6 +6,8 @@ import { gameAPI } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import DebugPanel from "../components/DebugPanel";
 import StoryViewer from "../components/StoryViewer";
+import EntityHistory from "../components/EntityHistory";
+import emojiKeywords from "emojilib";
 
 const GamePage = () => {
   const { id } = useParams();
@@ -15,6 +17,7 @@ const GamePage = () => {
   const [showDebug, setShowDebug] = useState(false);
   const [apiError, setApiError] = useState(null);
   const [selectedSegment, setSelectedSegment] = useState(null);
+  const [selectedEntity, setSelectedEntity] = useState(null);
 
   // Fetch game details
   const {
@@ -36,6 +39,20 @@ const GamePage = () => {
     queryKey: ["storyState", id],
     queryFn: () => gameAPI.getStoryState(id).then((res) => res.data),
     enabled: !!game, // Only run if game data is loaded
+  });
+
+  // Fetch entity history if an entity is selected
+  const {
+    data: entityHistory,
+    isLoading: entityHistoryLoading,
+    error: entityHistoryError,
+  } = useQuery({
+    queryKey: ["entityHistory", id, selectedEntity?.type, selectedEntity?.id],
+    queryFn: () =>
+      gameAPI
+        .getEntityHistory(id, selectedEntity.type, selectedEntity.id)
+        .then((res) => res.data),
+    enabled: !!selectedEntity, // Only run if an entity is selected
   });
 
   // Check if API key is available
@@ -123,6 +140,40 @@ const GamePage = () => {
   // Function to close the StoryViewer
   const handleCloseViewer = () => {
     setSelectedSegment(null);
+  };
+
+  // Function to handle entity selection for EntityHistory
+  const handleEntitySelect = (id, type) => {
+    setSelectedEntity({ id, type });
+  };
+
+  // Function to close the EntityHistory
+  const handleCloseEntityHistory = () => {
+    setSelectedEntity(null);
+  };
+
+  // Helper function to get state badge class
+  const getStateBadgeClass = (state) => {
+    if (!state) return "";
+
+    // Convert to lowercase for comparison
+    const lowerState = state.toLowerCase();
+
+    if (
+      lowerState === "broken" ||
+      lowerState === "consumed" ||
+      lowerState === "given_away" ||
+      lowerState === "lost" ||
+      lowerState === "hostile"
+    ) {
+      return "hostile";
+    }
+
+    if (lowerState === "found" || lowerState === "friendly") {
+      return "friendly";
+    }
+
+    return "";
   };
 
   if (gameLoading || storyLoading) {
@@ -324,12 +375,25 @@ const GamePage = () => {
             {items.length > 0 ? (
               <ul className="items-list">
                 {items.map((item) => (
-                  <li key={item.id} className="item">
-                    <span className="item-name">{item.name}</span>
+                  <li
+                    key={item.id}
+                    className="item"
+                    onClick={() => handleEntitySelect(item.id, "item")}
+                  >
+                    <div className="item-header">
+                      <span className="item-name">{item.name}</span>
+                      {item.currentState && item.currentState !== "DEFAULT" && (
+                        <span
+                          className={`relationship-badge ${getStateBadgeClass(
+                            item.currentState
+                          )}`}
+                        >
+                          {item.currentState}
+                        </span>
+                      )}
+                    </div>
                     {item.description && (
-                      <span className="item-description">
-                        {item.description}
-                      </span>
+                      <div className="item-description">{item.description}</div>
                     )}
                   </li>
                 ))}
@@ -344,7 +408,13 @@ const GamePage = () => {
             {characters.length > 0 ? (
               <ul className="characters-list">
                 {characters.map((character) => (
-                  <li key={character.id} className="character">
+                  <li
+                    key={character.id}
+                    className="character"
+                    onClick={() =>
+                      handleEntitySelect(character.id, "character")
+                    }
+                  >
                     <span className="character-name">{character.name}</span>
                     <span
                       className={`relationship-badge ${character.relationship.toLowerCase()}`}
@@ -364,6 +434,17 @@ const GamePage = () => {
       {/* Story Viewer modal when a past segment is clicked */}
       {selectedSegment && (
         <StoryViewer segment={selectedSegment} onClose={handleCloseViewer} />
+      )}
+
+      {/* Entity History modal when an entity is clicked */}
+      {selectedEntity && entityHistory && (
+        <EntityHistory
+          gameId={id}
+          entityId={selectedEntity.id}
+          entityType={selectedEntity.type}
+          history={entityHistory}
+          onClose={handleCloseEntityHistory}
+        />
       )}
     </div>
   );

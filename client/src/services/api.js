@@ -42,45 +42,79 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Track in-flight requests to prevent duplicates
+const pendingRequests = {};
+
 // Helper function to handle retries with exponential backoff
-const withRetry = async (apiCall, maxRetries = 3) => {
+const withRetry = async (apiCall, maxRetries = 3, requestId = null) => {
   let retryCount = 0;
   let lastError;
 
-  while (retryCount < maxRetries) {
-    try {
-      return await apiCall();
-    } catch (error) {
-      lastError = error;
-
-      // Check if it's a rate limit error (429)
-      if (error.response && error.response.status === 429) {
-        // Get retry-after from headers or use exponential backoff
-        const retryAfterHeader = error.response.headers["retry-after"];
-        const retryAfterSeconds = retryAfterHeader
-          ? parseInt(retryAfterHeader)
-          : Math.pow(2, retryCount + 1); // 2, 4, 8 seconds
-
-        console.log(
-          `Rate limited. Retrying after ${retryAfterSeconds} seconds...`
-        );
-
-        // Wait for the specified time
-        await new Promise((resolve) =>
-          setTimeout(resolve, retryAfterSeconds * 1000)
-        );
-        retryCount++;
-        continue;
-      }
-
-      // If it's not a rate limit error, just throw it immediately
-      throw error;
-    }
+  // If this is a request we want to debounce and it's already in progress
+  if (requestId && pendingRequests[requestId]) {
+    // Return the existing promise
+    return pendingRequests[requestId];
   }
 
-  // If we've exhausted all retries
-  console.error(`Failed after ${maxRetries} retries`, lastError);
-  throw lastError;
+  // Create a new promise for this request
+  const requestPromise = (async () => {
+    try {
+      // Add a minimum delay to prevent rapid successive calls
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      while (retryCount < maxRetries) {
+        try {
+          const result = await apiCall();
+          // Remove from pending requests when done
+          if (requestId) {
+            delete pendingRequests[requestId];
+          }
+          return result;
+        } catch (error) {
+          lastError = error;
+
+          // Check if it's a rate limit error (429)
+          if (error.response && error.response.status === 429) {
+            // Get retry-after from headers or use exponential backoff
+            const retryAfterHeader = error.response.headers["retry-after"];
+            const retryAfterSeconds = retryAfterHeader
+              ? parseInt(retryAfterHeader)
+              : Math.pow(2, retryCount + 1); // 2, 4, 8 seconds
+
+            console.log(
+              `Rate limited. Retrying after ${retryAfterSeconds} seconds...`
+            );
+
+            // Wait for the specified time
+            await new Promise((resolve) =>
+              setTimeout(resolve, retryAfterSeconds * 1000)
+            );
+            retryCount++;
+            continue;
+          }
+
+          // If it's not a rate limit error, just throw it immediately
+          throw error;
+        }
+      }
+
+      // If we've exhausted all retries
+      console.error(`Failed after ${maxRetries} retries`, lastError);
+      throw lastError;
+    } finally {
+      // Clean up in case of error
+      if (requestId) {
+        delete pendingRequests[requestId];
+      }
+    }
+  })();
+
+  // Store the promise if this is a debounced request
+  if (requestId) {
+    pendingRequests[requestId] = requestPromise;
+  }
+
+  return requestPromise;
 };
 
 // Create a function to add model options to API calls
@@ -93,6 +127,11 @@ const addModelOptions = (options = {}) => {
     provider: options.provider || apiSettings.preferredProvider,
     modelId: options.modelId || apiSettings.preferredModel,
   };
+};
+
+// Create a request ID for debouncing
+const createRequestId = (endpoint, params) => {
+  return `${endpoint}:${JSON.stringify(params)}`;
 };
 
 // Auth Services
@@ -112,37 +151,66 @@ export const characterAPI = {
   delete: (id) => api.delete(`/characters/${id}`),
 
   // Character generation with model options and retry logic
-  generateNames: (genreData, options = {}) =>
-    withRetry(() =>
-      api.post("/character-generator/names", {
-        ...genreData,
-        ...addModelOptions(options),
-      })
-    ),
+  generateNames: (genreData, options = {}) => {
+    const requestId = createRequestId("generateNames", {
+      ...genreData,
+      ...options,
+    });
+    return withRetry(
+      () =>
+        api.post("/character-generator/names", {
+          ...genreData,
+          ...addModelOptions(options),
+        }),
+      3,
+      requestId
+    );
+  },
 
-  generateTraits: (data, options = {}) =>
-    withRetry(() =>
-      api.post("/character-generator/traits", {
-        ...data,
-        ...addModelOptions(options),
-      })
-    ),
+  generateTraits: (data, options = {}) => {
+    const requestId = createRequestId("generateTraits", {
+      ...data,
+      ...options,
+    });
+    return withRetry(
+      () =>
+        api.post("/character-generator/traits", {
+          ...data,
+          ...addModelOptions(options),
+        }),
+      3,
+      requestId
+    );
+  },
 
-  generateBios: (data, options = {}) =>
-    withRetry(() =>
-      api.post("/character-generator/bios", {
-        ...data,
-        ...addModelOptions(options),
-      })
-    ),
+  generateBios: (data, options = {}) => {
+    const requestId = createRequestId("generateBios", { ...data, ...options });
+    return withRetry(
+      () =>
+        api.post("/character-generator/bios", {
+          ...data,
+          ...addModelOptions(options),
+        }),
+      3,
+      requestId
+    );
+  },
 
-  generateRandom: (genreData, options = {}) =>
-    withRetry(() =>
-      api.post("/character-generator/random", {
-        ...genreData,
-        ...addModelOptions(options),
-      })
-    ),
+  generateRandom: (genreData, options = {}) => {
+    const requestId = createRequestId("generateRandom", {
+      ...genreData,
+      ...options,
+    });
+    return withRetry(
+      () =>
+        api.post("/character-generator/random", {
+          ...genreData,
+          ...addModelOptions(options),
+        }),
+      3,
+      requestId
+    );
+  },
 };
 
 // Game Services
@@ -154,32 +222,62 @@ export const gameAPI = {
   delete: (id) => api.delete(`/games/${id}`),
 
   // Title generation with model options and retry logic
-  generateTitles: (genreData, options = {}) =>
-    withRetry(() =>
-      api.post("/games/generate-titles", {
-        ...genreData,
-        ...addModelOptions(options),
-      })
-    ),
+  generateTitles: (genreData, options = {}) => {
+    const requestId = createRequestId("generateTitles", {
+      ...genreData,
+      ...options,
+    });
+    return withRetry(
+      () =>
+        api.post("/games/generate-titles", {
+          ...genreData,
+          ...addModelOptions(options),
+        }),
+      3,
+      requestId
+    );
+  },
 
   // Story progression with model options and retry logic
   getStoryState: (gameId) => api.get(`/games/${gameId}/story`),
-  startStory: (gameId, options = {}) =>
-    withRetry(() =>
-      api.post(`/games/${gameId}/story/start`, addModelOptions(options))
-    ),
-  makeChoice: (gameId, data, options = {}) =>
-    withRetry(() =>
-      api.post(`/games/${gameId}/story/choice`, {
-        ...data,
-        ...addModelOptions(options),
-      })
-    ),
+
+  startStory: (gameId, options = {}) => {
+    const requestId = createRequestId("startStory", { gameId, ...options });
+    return withRetry(
+      () => api.post(`/games/${gameId}/story/start`, addModelOptions(options)),
+      3,
+      requestId
+    );
+  },
+
+  makeChoice: (gameId, data, options = {}) => {
+    const requestId = createRequestId("makeChoice", {
+      gameId,
+      ...data,
+      ...options,
+    });
+    return withRetry(
+      () =>
+        api.post(`/games/${gameId}/story/choice`, {
+          ...data,
+          ...addModelOptions(options),
+        }),
+      3,
+      requestId
+    );
+  },
+
+  // Entity history - with fixed implementation to match your pattern
+  getEntityHistory: (gameId, entityType, entityId) =>
+    api.get(`/games/${gameId}/entity/${entityType}/${entityId}`),
 };
 
 // Model/Provider Services
 export const modelAPI = {
-  getModels: (provider) => withRetry(() => api.get(`/models/${provider}`)),
+  getModels: (provider) => {
+    const requestId = createRequestId("getModels", { provider });
+    return withRetry(() => api.get(`/models/${provider}`), 3, requestId);
+  },
 };
 
 // Context Config Services

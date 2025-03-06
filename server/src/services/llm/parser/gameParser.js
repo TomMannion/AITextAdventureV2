@@ -35,6 +35,7 @@ export function parseTitleResponse(response) {
  * @returns {Object} - Parsed story segment
  */
 export function parseStoryResponse(response, isEnding = false) {
+  console.log(response);
   try {
     // Directly parse the JSON response
     const result =

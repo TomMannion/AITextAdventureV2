@@ -24,9 +24,8 @@ export async function generateTitleSuggestions(req, res) {
 
     // Setup options for title generation
     const options = {
-      provider:
-        user?.preferredProvider || process.env.DEFAULT_LLM_PROVIDER || "openai",
-      modelId: user?.preferredModel,
+      provider: req.body.preferredProvider || "groq",
+      modelId: req.body.preferredModel || "llama-3.1-8b-instant",
       apiKey: req.headers["x-llm-api-key"],
     };
 

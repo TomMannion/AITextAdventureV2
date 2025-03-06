@@ -8,9 +8,11 @@ import genrePromptSystem from "./genrePromptSystem.js";
  * @param {Object} character - Character information
  * @returns {string} - Formatted user prompt
  */
+
 export function generateInitialUserPrompt(game, character) {
   // Get genre and stage specific prompt components
   const genreStagePrompt = genrePromptSystem.createGenreStagePrompt(
+    game,
     game.genre,
     "INTRODUCTION"
   );
@@ -56,6 +58,7 @@ export function generateContinuationUserPrompt(
 
   // Get genre and stage specific prompt
   const genreStagePrompt = genrePromptSystem.createGenreStagePrompt(
+    game,
     game.genre,
     currentStage
   );

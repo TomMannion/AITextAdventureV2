@@ -3,6 +3,55 @@
 /**
  * Comprehensive genre prompt system that scales easily with new genres
  */
+const NARRATIVE_PRINCIPLES = {
+  FOUNDATIONS: `
+## Core Storytelling Principles ##
+1. Thematic Resonance: Every scene must:
+   - Advance at least two plot threads
+   - Reveal new character dimension
+   - Deepen central thematic conflict
+
+2. Dynamic Perspective:
+   - Environmental details reflect viewpoint character's emotional state
+   - Sensory information prioritized by current urgency level
+   - Memory fragments emerge organically from context triggers
+
+3. Revelatory Design:
+   - Early Setup (Turns 1-8): Plant 3 competing theories
+   - Middle Development (Turns 9-16): Confirm and contradict equally
+   - Endgame (Turns 17-25): Resolve through unexpected synthesis
+
+4. Language Craft:
+   - Vary sentence structures using the 1-3-1 rhythm:
+     * 1 complex atmospheric sentence
+     * 3 varied-pace action/dialogue sentences
+     * 1 concise impactful statement
+   - Rotate descriptive focal points: 
+     Tactile -> Auditory -> Olfactory -> Spatial
+`,
+
+  PACING_MATRIX: (currentTurn, maxTurns) => {
+    const turnPercentage = (currentTurn / maxTurns) * 100;
+    return `
+## Turn ${currentTurn} Pacing Guide (${maxTurns} Total) ##
+${
+  turnPercentage < 33
+    ? `Early Game (World-Building Focus):
+- Introduce 2 environmental mysteries
+- Establish 1 false character assumption
+- Bury 1 subtle foreshadowing element`
+    : turnPercentage < 66
+    ? `Mid Game (Consequence Focus):
+- Force reconciliation of conflicting goals
+- Reveal hidden cost of earlier choices
+- Complicate 1 key relationship`
+    : `End Game (Synthesis Focus):
+- Resolve minor plot thread unexpectedly early
+- Make victory require personal sacrifice
+- Leave 1 mystery deliberately ambiguous`
+}`;
+  },
+};
 
 // Base components for all story types
 const BASE_COMPONENTS = {
@@ -352,7 +401,7 @@ const GENRE_CONFIGS = {
  * @param {Object} options - Additional options (tone overrides, etc.)
  * @returns {string} - Complete genre and stage specific prompt
  */
-function createGenreStagePrompt(genre, stage, options = {}) {
+function createGenreStagePrompt(game, genre, stage, options = {}) {
   // Normalize genre input
   const normalizedGenre = genre.toLowerCase().trim();
 
@@ -424,6 +473,32 @@ function createGenreStagePrompt(genre, stage, options = {}) {
       ", "
     )}.\n\n`;
   }
+
+  // Add core principles
+  prompt += NARRATIVE_PRINCIPLES.FOUNDATIONS;
+
+  // Add dynamic pacing
+  prompt += NARRATIVE_PRINCIPLES.PACING_MATRIX(game.turnCount, 25);
+
+  // Modified tone guidance
+  prompt += `
+  Tone Construction:
+  - Emotional palette: Blend 2 contrasting moods
+  - Dialogue subtext: 40% of meaning unspoken
+  - Environmental personality: Make setting react to events`;
+
+  // Updated element guidance
+  prompt += `
+  Element Implementation:
+  1. For ${genreConfig.elements.settings[0]}:
+     - Show 1 normal function
+     - Hint at 1 hidden purpose
+     - Leave 1 mystery unresolved
+  
+  2. For ${genreConfig.elements.items[0]}:
+     - Reveal unexpected limitation
+     - Suggest alternative uses
+     - Bury origin story fragment`;
 
   return prompt;
 }
