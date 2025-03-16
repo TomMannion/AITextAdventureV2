@@ -1,8 +1,11 @@
 // src/features/game-engine/components/GamePlayer.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
 import useGameState from "../hooks/useGameState";
 import { win95Border } from "../../../utils/styleUtils";
+import useGameNotifications from "../../../hooks/useGameNotifications";
+import Button from "../../../components/common/Button";
+import Text from "../../../components/common/Text";
 
 // Styled components
 const PlayerContainer = styled.div`
@@ -19,6 +22,7 @@ const Toolbar = styled.div`
   gap: 5px;
   padding: 5px;
   border-bottom: 1px solid var(--win95-border-darker);
+  background-color: var(--win95-window-bg);
 `;
 
 const ToolbarButton = styled.button`
@@ -36,6 +40,11 @@ const ToolbarButton = styled.button`
     border-bottom-color: var(--win95-border-light);
     border-right-color: var(--win95-border-light);
     padding: 3px 7px 1px 9px;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 `;
 
@@ -68,11 +77,19 @@ const StoryContent = styled.div`
   font-size: 14px;
   line-height: 1.5;
   white-space: pre-line; /* Preserve line breaks in story content */
+  background-color: white;
+`;
+
+const StorySegment = styled.div`
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: ${(props) => (props.$isLatest ? "none" : "1px dashed #ccc")};
 `;
 
 const ChoicesPanel = styled.div`
   padding: 10px;
   border-top: 1px solid var(--win95-border-darker);
+  background-color: var(--win95-window-bg);
 `;
 
 const ChoicesList = styled.div`
@@ -94,6 +111,11 @@ const ChoiceButton = styled.button`
     background-color: ${(props) =>
       props.$selected ? "var(--win95-window-header)" : "#f0f0f0"};
   }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const CustomChoiceSection = styled.div`
@@ -107,6 +129,7 @@ const CustomChoiceInput = styled.input`
   padding: 8px;
   margin-bottom: 8px;
   border: 1px solid var(--win95-border-darker);
+  ${win95Border("inset")}
 `;
 
 const SubmitButton = styled.button`
@@ -238,6 +261,14 @@ const ErrorBox = styled.div`
   text-align: center;
 `;
 
+const SegmentControls = styled.div`
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 5px;
+  background-color: #e0e0e0;
+`;
+
 /**
  * GamePlayer component - Handles the main game interaction screen
  */
@@ -251,18 +282,61 @@ const GamePlayer = () => {
     customOption,
     error,
     status,
+    loadingProgress,
     setSelectedOption,
     setCustomOption,
     submitChoice,
     saveGame,
     returnToLauncher,
+    startLoadedGame,
   } = useGameState();
+
+  const {
+    showManualSaveNotification,
+    showErrorWithRetry,
+    showAchievementNotification,
+  } = useGameNotifications();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [gameLog, setGameLog] = useState([]);
   const [statusMessage, setStatusMessage] = useState(
     "Ready for your next action"
   );
+  const [showAllSegments, setShowAllSegments] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+
+  const contentRef = useRef(null);
+
+  // Initialize game state when component mounts
+  useEffect(() => {
+    if (currentGame && !initialLoadComplete) {
+      // Check if we need to start the game (generate initial segment)
+      const needsInitialSegment = !segments || segments.length === 0;
+
+      if (needsInitialSegment) {
+        // Game has been loaded but no story segments exist yet
+        const initGame = async () => {
+          setStatusMessage("Generating your adventure...");
+
+          try {
+            await startLoadedGame(currentGame.id);
+            setStatusMessage("Your adventure begins...");
+            setInitialLoadComplete(true);
+          } catch (err) {
+            console.error("Failed to initialize game:", err);
+            setStatusMessage(
+              "Failed to generate your adventure. Please try again."
+            );
+          }
+        };
+
+        initGame();
+      } else {
+        setInitialLoadComplete(true);
+        setStatusMessage("Your adventure continues...");
+      }
+    }
+  }, [currentGame, segments, initialLoadComplete, startLoadedGame]);
 
   // Initialize game log with segments when component mounts or segments change
   useEffect(() => {
@@ -276,6 +350,13 @@ const GamePlayer = () => {
       setGameLog(logEntries);
     }
   }, [segments]);
+
+  // Scroll to bottom when new segments are added
+  useEffect(() => {
+    if (contentRef.current && currentSegment) {
+      contentRef.current.scrollTop = contentRef.current.scrollHeight;
+    }
+  }, [currentSegment]);
 
   // Handle submission of choice
   const handleSubmitChoice = async () => {
@@ -310,20 +391,11 @@ const GamePlayer = () => {
 
         // Show notification for significant story events if needed
         if (result.isSignificantEvent) {
-          try {
-            import("../../../hooks/useGameNotifications").then((module) => {
-              const useGameNotifications = module.default;
-              const { showAchievementNotification } = useGameNotifications();
-              showAchievementNotification({
-                title: "Story Progress",
-                message:
-                  "You've reached a significant point in your adventure!",
-                gameId: currentGame?.id,
-              });
-            });
-          } catch (err) {
-            console.error("Failed to import notification hook:", err);
-          }
+          showAchievementNotification({
+            title: "Story Progress",
+            message: "You've reached a significant point in your adventure!",
+            gameId: currentGame?.id,
+          });
         }
 
         setStatusMessage("What will you do next?");
@@ -335,20 +407,12 @@ const GamePlayer = () => {
       setStatusMessage("An error occurred. Please try again.");
 
       // Show error notification
-      try {
-        import("../../../hooks/useGameNotifications").then((module) => {
-          const useGameNotifications = module.default;
-          const { showErrorWithRetry } = useGameNotifications();
-          showErrorWithRetry({
-            title: "Action Failed",
-            message: "Failed to process your action. Please try again.",
-            operation: "submit_choice",
-            retryCallback: () => handleSubmitChoice(),
-          });
-        });
-      } catch (err) {
-        console.error("Failed to import notification hook:", err);
-      }
+      showErrorWithRetry({
+        title: "Action Failed",
+        message: "Failed to process your action. Please try again.",
+        operation: "submit_choice",
+        retryCallback: () => handleSubmitChoice(),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -365,19 +429,11 @@ const GamePlayer = () => {
     );
 
     if (success) {
-      // Use notification service to show save notification
-      try {
-        import("../../../hooks/useGameNotifications").then((module) => {
-          const useGameNotifications = module.default;
-          const { showManualSaveNotification } = useGameNotifications();
-          showManualSaveNotification({
-            gameId: currentGame?.id,
-            timestamp: new Date(),
-          });
-        });
-      } catch (err) {
-        console.error("Failed to import notification hook:", err);
-      }
+      // Show save notification
+      showManualSaveNotification({
+        gameId: currentGame?.id,
+        timestamp: new Date(),
+      });
 
       setGameLog((prev) => [
         ...prev,
@@ -388,6 +444,11 @@ const GamePlayer = () => {
         },
       ]);
     }
+  };
+
+  // Toggle between showing only the current segment or all segments
+  const toggleSegmentView = () => {
+    setShowAllSegments((prev) => !prev);
   };
 
   // Format date for display
@@ -411,7 +472,7 @@ const GamePlayer = () => {
         <LoadingOverlay>
           <LoadingBox>
             <p>Processing your adventure...</p>
-            <ProgressBar $progress={`100%`} />
+            <ProgressBar $progress={`${loadingProgress || 50}%`} />
           </LoadingBox>
         </LoadingOverlay>
         <MainSection>
@@ -423,7 +484,7 @@ const GamePlayer = () => {
   }
 
   // Show error if game could not be loaded
-  if (error && !currentSegment) {
+  if (error && !currentSegment && !isSubmitting) {
     return (
       <PlayerContainer>
         <Toolbar>
@@ -439,6 +500,13 @@ const GamePlayer = () => {
     );
   }
 
+  // Determine what segments to show
+  const segmentsToShow = showAllSegments
+    ? segments
+    : currentSegment
+    ? [currentSegment]
+    : [];
+
   return (
     <PlayerContainer>
       {isSubmitting && (
@@ -452,57 +520,87 @@ const GamePlayer = () => {
 
       <Toolbar>
         <ToolbarButton onClick={returnToLauncher}>Back</ToolbarButton>
-        <ToolbarButton onClick={handleSaveGame}>Save</ToolbarButton>
-        <ToolbarButton>Help</ToolbarButton>
+        <ToolbarButton
+          onClick={handleSaveGame}
+          disabled={!currentSegment || isSubmitting}
+        >
+          Save
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={toggleSegmentView}
+          disabled={!segments || segments.length <= 1}
+        >
+          {showAllSegments ? "Show Current Only" : "Show All Segments"}
+        </ToolbarButton>
       </Toolbar>
 
       <MainSection>
         <StoryPanel>
           <StoryTitle>{currentGame?.title || "Text Adventure"}</StoryTitle>
 
-          <StoryContent>
-            {currentSegment ? (
-              <div>
-                <p>{currentSegment.content}</p>
-              </div>
+          <StoryContent ref={contentRef}>
+            {segmentsToShow && segmentsToShow.length > 0 ? (
+              segmentsToShow.map((segment, index) => (
+                <StorySegment
+                  key={segment.id || index}
+                  $isLatest={index === segmentsToShow.length - 1}
+                >
+                  {segment.content}
+                </StorySegment>
+              ))
             ) : (
-              <Placeholder>Loading story content...</Placeholder>
+              <Placeholder>
+                {initialLoadComplete
+                  ? "Your adventure will appear here..."
+                  : "Loading your adventure..."}
+              </Placeholder>
             )}
           </StoryContent>
 
           <ChoicesPanel>
-            <ChoicesList>
-              {options && options.length > 0 ? (
-                options.map((option) => (
-                  <ChoiceButton
-                    key={option.id}
-                    $selected={selectedOption === option.id}
-                    onClick={() => setSelectedOption(option.id)}
-                  >
-                    {option.text}
-                  </ChoiceButton>
-                ))
-              ) : (
-                <Placeholder>No options available</Placeholder>
-              )}
-            </ChoicesList>
+            {currentSegment ? (
+              <>
+                <ChoicesList>
+                  {options && options.length > 0 ? (
+                    options.map((option) => (
+                      <ChoiceButton
+                        key={option.id}
+                        $selected={selectedOption === option.id}
+                        onClick={() => setSelectedOption(option.id)}
+                        disabled={isSubmitting}
+                      >
+                        {option.text}
+                      </ChoiceButton>
+                    ))
+                  ) : (
+                    <Placeholder>Loading options...</Placeholder>
+                  )}
+                </ChoicesList>
 
-            <CustomChoiceSection>
-              <CustomChoiceInput
-                placeholder="Or write your own action..."
-                value={customOption}
-                onChange={(e) => setCustomOption(e.target.value)}
-                disabled={isSubmitting}
-              />
-              <SubmitButton
-                onClick={handleSubmitChoice}
-                disabled={
-                  isSubmitting || (!selectedOption && !customOption.trim())
-                }
-              >
-                Continue
-              </SubmitButton>
-            </CustomChoiceSection>
+                <CustomChoiceSection>
+                  <CustomChoiceInput
+                    placeholder="Or write your own action..."
+                    value={customOption}
+                    onChange={(e) => setCustomOption(e.target.value)}
+                    disabled={isSubmitting}
+                  />
+                  <SubmitButton
+                    onClick={handleSubmitChoice}
+                    disabled={
+                      isSubmitting || (!selectedOption && !customOption.trim())
+                    }
+                  >
+                    Continue
+                  </SubmitButton>
+                </CustomChoiceSection>
+              </>
+            ) : (
+              <Placeholder>
+                {initialLoadComplete
+                  ? "Waiting for story to begin..."
+                  : "Loading your adventure..."}
+              </Placeholder>
+            )}
           </ChoicesPanel>
         </StoryPanel>
 

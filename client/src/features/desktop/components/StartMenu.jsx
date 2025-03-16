@@ -1,5 +1,5 @@
-// src/features/desktop/components/StartMenu.jsx (Updated with Logout)
-import React from "react";
+// src/features/desktop/components/StartMenu.jsx
+import React, { useState, useRef, useEffect } from "react";
 import styled from "styled-components";
 import Text from "../../../components/common/Text";
 import { win95Border } from "../../../utils/styleUtils";
@@ -48,6 +48,7 @@ const MenuItem = styled.div`
   padding: 8px 16px;
   display: flex;
   align-items: center;
+  position: relative;
   cursor: default;
 
   &:hover {
@@ -72,7 +73,7 @@ const Divider = styled.div`
 const SubMenuContainer = styled.div`
   position: absolute;
   left: 100%;
-  top: ${(props) => props.$top || "0"}px;
+  top: ${(props) => props.$top || "0px"};
   background-color: var(--win95-button-face, #c0c0c0);
   ${win95Border("outset")}
   box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
@@ -81,18 +82,28 @@ const SubMenuContainer = styled.div`
   width: 180px;
 `;
 
+const ArrowIndicator = styled.span`
+  margin-left: auto;
+`;
+
 /**
- * Start Menu component
- *
- * @param {Object} props - Component props
- * @param {boolean} props.isOpen - Whether the menu is open
- * @param {string} props.username - Current username
- * @param {Function} props.onMenuItemClick - Handler for menu item click
+ * Start Menu component - Windows 95 style Start Menu
  */
 const StartMenu = ({ isOpen, username = "User", onMenuItemClick }) => {
-  const [activeSubmenu, setActiveSubmenu] = React.useState(null);
-  const [submenuPosition, setSubmenuPosition] = React.useState(0);
+  const [activeSubmenu, setActiveSubmenu] = useState(null);
+  const [submenuPosition, setSubmenuPosition] = useState({ top: 0 });
   const { logout } = useAuth();
+
+  // Refs for measuring elements
+  const menuRef = useRef(null);
+  const submenuRef = useRef({});
+
+  // Close submenu when menu closes
+  useEffect(() => {
+    if (!isOpen) {
+      setActiveSubmenu(null);
+    }
+  }, [isOpen]);
 
   // Menu item definitions with submenu items
   const menuItems = [
@@ -161,9 +172,29 @@ const StartMenu = ({ isOpen, username = "User", onMenuItemClick }) => {
     if (item?.hasSubmenu) {
       setActiveSubmenu(itemId);
 
-      // Calculate submenu position based on parent position
+      // Get the position of the menu item
       const rect = e.currentTarget.getBoundingClientRect();
-      setSubmenuPosition(rect.top - 2); // Align with parent item
+
+      // Get window dimensions
+      const windowHeight = window.innerHeight;
+
+      // If we have a reference to the submenu element
+      if (submenuRef.current[itemId]) {
+        const submenuHeight = submenuRef.current[itemId].clientHeight;
+
+        // Calculate best position for submenu
+        let top = 0;
+
+        // If submenu would extend below the window, adjust position
+        if (rect.top + submenuHeight > windowHeight) {
+          top = Math.max(0, windowHeight - submenuHeight - rect.top);
+        }
+
+        setSubmenuPosition({ top: `${top}px` });
+      } else {
+        // Default to starting at the top of the parent menu item
+        setSubmenuPosition({ top: "0px" });
+      }
     } else {
       setActiveSubmenu(null);
     }
@@ -208,8 +239,15 @@ const StartMenu = ({ isOpen, username = "User", onMenuItemClick }) => {
     }
   };
 
+  // Save a reference to submenu elements when they mount
+  const setSubmenuRef = (itemId, element) => {
+    if (element) {
+      submenuRef.current[itemId] = element;
+    }
+  };
+
   return (
-    <MenuContainer $isOpen={isOpen} id="start-menu">
+    <MenuContainer $isOpen={isOpen} id="start-menu" ref={menuRef}>
       <MenuSidebar>
         <SidebarText>Windows 95</SidebarText>
       </MenuSidebar>
@@ -229,13 +267,15 @@ const StartMenu = ({ isOpen, username = "User", onMenuItemClick }) => {
               {item.icon && <MenuItemIcon src={item.icon} alt="" />}
               <Text>{item.label}</Text>
 
-              {item.hasSubmenu && (
-                <span style={{ marginLeft: "auto" }}>&#9658;</span>
-              )}
+              {item.hasSubmenu && <ArrowIndicator>&#9654;</ArrowIndicator>}
 
               {/* Render submenu if this item has one and it's active */}
               {item.hasSubmenu && activeSubmenu === item.id && (
-                <SubMenuContainer $isOpen={true} $top={submenuPosition}>
+                <SubMenuContainer
+                  $isOpen={true}
+                  $top={submenuPosition.top}
+                  ref={(el) => setSubmenuRef(item.id, el)}
+                >
                   {item.submenuItems.map((subItem) => (
                     <MenuItem
                       key={subItem.id}

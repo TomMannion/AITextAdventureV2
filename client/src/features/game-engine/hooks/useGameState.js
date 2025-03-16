@@ -145,9 +145,15 @@ const useGameState = () => {
   const loadExistingGame = useCallback(
     async (gameId) => {
       console.log(`Loading game: ${gameId}`);
-      return await loadGame(gameId);
+      try {
+        return await loadGame(gameId);
+      } catch (error) {
+        console.error(`Error loading game ${gameId}:`, error);
+        setError(`Failed to load game: ${error.message || "Unknown error"}`);
+        return null;
+      }
     },
-    [loadGame]
+    [loadGame, setError]
   );
 
   /**
@@ -160,7 +166,20 @@ const useGameState = () => {
         return null;
       }
 
-      return await startGame(gameId);
+      try {
+        console.log(`Starting game ${gameId} with initial story generation`);
+        const result = await startGame(gameId);
+
+        if (!result) {
+          throw new Error("Failed to start game - no result returned");
+        }
+
+        return result;
+      } catch (error) {
+        console.error(`Error starting game ${gameId}:`, error);
+        setError(`Failed to start game: ${error.message || "Unknown error"}`);
+        return null;
+      }
     },
     [validateApiKey, setError, startGame]
   );
@@ -191,6 +210,11 @@ const useGameState = () => {
       }
 
       try {
+        console.log(
+          `Submitting choice for game ${currentGame.id}:`,
+          optionId ? `Option ID: ${optionId}` : `Custom Text: ${customText}`
+        );
+
         // Prepare the choice data
         const choiceData = optionId
           ? { optionId }
@@ -198,6 +222,11 @@ const useGameState = () => {
 
         // Call the API to create the next story segment
         const response = await createStorySegment(currentGame.id, choiceData);
+        console.log("Story progression response:", response);
+
+        if (!response) {
+          throw new Error("No response received from server");
+        }
 
         // Reset the selected options after submission
         setSelectedOption(null);
@@ -205,7 +234,9 @@ const useGameState = () => {
 
         return response;
       } catch (error) {
-        setError(error.message || "Failed to progress the story");
+        const errorMessage = error.message || "Failed to progress the story";
+        console.error("Error submitting choice:", errorMessage);
+        setError(errorMessage);
         return null;
       }
     },
@@ -229,8 +260,10 @@ const useGameState = () => {
     }
 
     try {
+      console.log(`Saving game ${currentGame.id}`);
       return await contextSaveGame(currentGame.id);
     } catch (error) {
+      console.error(`Error saving game ${currentGame.id}:`, error);
       setError(error.message || "Failed to save game");
       return false;
     }

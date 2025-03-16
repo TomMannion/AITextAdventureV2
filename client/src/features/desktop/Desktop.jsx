@@ -26,8 +26,14 @@ const DesktopContent = ({ username = "User" }) => {
   const { openWindow } = useWindowSystem();
 
   // Register application windows on first render
+  // Use a ref to ensure it only runs once
+  const registeredRef = React.useRef(false);
+
   useEffect(() => {
-    registerApplicationWindows();
+    if (!registeredRef.current) {
+      registerApplicationWindows();
+      registeredRef.current = true;
+    }
   }, []);
 
   // Toggle start menu

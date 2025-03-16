@@ -113,6 +113,9 @@ const LoginForm = ({ onRegisterClick }) => {
   const { login, error } = useAuth();
   const navigate = useNavigate();
 
+  // Important: Call hooks at the top level, outside of any handlers
+  const gameNotifications = useGameNotifications();
+
   /**
    * Handle form submission
    */
@@ -137,34 +140,34 @@ const LoginForm = ({ onRegisterClick }) => {
       console.log("Attempting login with:", { email, password });
       const user = await login({ email, password });
 
-      // Show welcome notification
+      // Show welcome notification - using the pre-initialized hook
       try {
-        import("../../../hooks/useGameNotifications").then((module) => {
-          const useGameNotifications = module.default;
-          const { showWelcomeNotification } = useGameNotifications();
+        // Since we already initialized the hook at the top level,
+        // we can safely use its methods here
+        const { showWelcomeNotification } = gameNotifications;
 
-          // Check if this is first login of the day
-          const lastLogin = localStorage.getItem("last_login_date");
-          const today = new Date().toDateString();
-          const isFirstLoginOfDay = lastLogin !== today;
+        // Check if this is first login of the day
+        const lastLogin = localStorage.getItem("last_login_date");
+        const today = new Date().toDateString();
+        const isFirstLoginOfDay = lastLogin !== today;
 
-          // Save today's date as last login
-          localStorage.setItem("last_login_date", today);
+        // Save today's date as last login
+        localStorage.setItem("last_login_date", today);
 
-          // Show welcome notification
-          showWelcomeNotification({
-            username: user.username || user.displayName || "User",
-            isFirstLoginOfDay,
-            // You might need to fetch unfinished games from your API
-            unfinishedGames: [],
-            openGameCallback: (gameId) => {
-              // This would be handled by your game service
-              console.log("Opening game:", gameId);
-            },
-          });
+        // Show welcome notification
+        showWelcomeNotification({
+          username: user.username || user.displayName || "User",
+          isFirstLoginOfDay,
+          // You might need to fetch unfinished games from your API
+          unfinishedGames: [],
+          openGameCallback: (gameId) => {
+            // This would be handled by your game service
+            console.log("Opening game:", gameId);
+          },
         });
       } catch (err) {
-        console.error("Failed to import notification hook:", err);
+        console.error("Failed to display welcome notification:", err);
+        // Continue with normal flow even if notification fails
       }
 
       // Navigate to desktop on successful login

@@ -1,7 +1,11 @@
 // src/features/game-engine/components/GameBrowser.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import useGameState from "../hooks/useGameState";
+import Button from "../../../components/common/Button";
+import Text from "../../../components/common/Text";
+import { win95Border } from "../../../utils/styleUtils";
+import EmptyGameState from "./EmptyGameState";
 
 // Styled components
 const BrowserContainer = styled.div`
@@ -43,6 +47,7 @@ const FilterSelect = styled.select`
   font-size: 12px;
   padding: 2px 5px;
   border: 1px solid var(--win95-border-darker);
+  ${win95Border("inset")}
 `;
 
 const RefreshButton = styled.button`
@@ -71,7 +76,7 @@ const RefreshButton = styled.button`
 const GameList = styled.div`
   flex-grow: 1;
   overflow-y: auto;
-  border: 1px solid var(--win95-border-darker);
+  ${win95Border("inset")}
   background-color: white;
 `;
 
@@ -150,36 +155,12 @@ const ButtonContainer = styled.div`
   margin-top: 15px;
 `;
 
-const Button = styled.button`
-  background-color: var(--win95-window-bg);
-  border: 2px solid var(--win95-border-darker);
-  border-top-color: var(--win95-border-light);
-  border-left-color: var(--win95-border-light);
-  padding: 6px 12px;
-  cursor: pointer;
-
-  &:active {
-    border-top-color: var(--win95-border-darker);
-    border-left-color: var(--win95-border-darker);
-    border-bottom-color: var(--win95-border-light);
-    border-right-color: var(--win95-border-light);
-    padding: 7px 11px 5px 13px;
-  }
-
-  ${(props) =>
-    props.$primary &&
-    `
-    font-weight: bold;
-  `}
-`;
-
 const ErrorMessage = styled.div`
-  padding: 20px;
-  margin: 20px 0;
-  background-color: #ffe0e0;
-  border: 1px solid #ff0000;
   color: #ff0000;
-  text-align: center;
+  padding: 8px;
+  margin-top: 10px;
+  border: 1px solid #ff0000;
+  background-color: #fff0f0;
 `;
 
 const formatDate = (dateString) => {
@@ -200,9 +181,10 @@ const GameBrowser = () => {
     error,
     gamesInitialized,
     returnToLauncher,
-    refreshGames, // Renamed from browseGames for clarity
+    refreshGames,
     loadExistingGame,
     startNewGame,
+    clearError,
   } = useGameState();
 
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -215,6 +197,14 @@ const GameBrowser = () => {
   const isValidGameList = Array.isArray(gameList) && gameList.length > 0;
   const isLoading = status === "loading";
 
+  // Clear local errors when main error state changes
+  useEffect(() => {
+    if (error) {
+      setLocalError("");
+    }
+  }, [error]);
+
+  // Apply filters to the game list
   const filteredGames = isValidGameList
     ? gameList.filter((game) => {
         if (statusFilter !== "ALL" && game.status !== statusFilter) {
@@ -235,6 +225,7 @@ const GameBrowser = () => {
     setLocalError("");
 
     try {
+      if (clearError) clearError();
       await refreshGames(true); // Pass true to force refresh
     } catch (err) {
       console.error("Error refreshing games:", err);
@@ -250,12 +241,29 @@ const GameBrowser = () => {
   // Handle loading a game
   const handleLoadGame = (gameId) => {
     try {
+      if (clearError) clearError();
+      setLocalError("");
       loadExistingGame(gameId);
     } catch (err) {
       console.error("Error loading game:", err);
       setLocalError("Failed to load the selected game. Please try again.");
     }
   };
+
+  // If there are no games, show empty state
+  if (
+    gamesInitialized &&
+    !isLoading &&
+    (!isValidGameList || gameList.length === 0)
+  ) {
+    return (
+      <EmptyGameState
+        onCreateNew={startNewGame}
+        onRefresh={handleRefresh}
+        isLoading={isLoading}
+      />
+    );
+  }
 
   // Render loading state
   if (isLoading) {
@@ -327,6 +335,8 @@ const GameBrowser = () => {
               ? "Initializing games..."
               : "No adventures found. Start a new one!"}
           </EmptyState>
+        ) : filteredGames.length === 0 ? (
+          <EmptyState>No adventures match your filters.</EmptyState>
         ) : (
           filteredGames.map((game) => (
             <GameItem

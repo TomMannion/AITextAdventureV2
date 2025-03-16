@@ -7,6 +7,7 @@ import React, {
   useRef,
 } from "react";
 import { useThemeContext } from "./ThemeContext";
+import { useNotification } from "./NotificationContext";
 import { gameService } from "../services/api.service";
 
 // Initial state for game context
@@ -46,6 +47,7 @@ const ACTIONS = {
   SET_STATUS: "set_status",
   SET_LOADING_PROGRESS: "set_loading_progress",
   SET_ERROR: "set_error",
+  CLEAR_ERROR: "clear_error",
   SET_CURRENT_GAME: "set_current_game",
   SET_GAME_LIST: "set_game_list",
   SET_GAMES_INITIALIZED: "set_games_initialized",
@@ -75,6 +77,8 @@ const gameReducer = (state, action) => {
         error: action.payload,
         status: action.payload ? "error" : state.status,
       };
+    case ACTIONS.CLEAR_ERROR:
+      return { ...state, error: null };
     case ACTIONS.SET_CURRENT_GAME:
       return { ...state, currentGame: action.payload };
     case ACTIONS.SET_GAME_LIST:
@@ -108,9 +112,10 @@ const gameReducer = (state, action) => {
     case ACTIONS.SET_SEGMENTS:
       return { ...state, segments: action.payload };
     case ACTIONS.ADD_SEGMENT:
+      const updatedSegments = [...state.segments, action.payload];
       return {
         ...state,
-        segments: [...state.segments, action.payload],
+        segments: updatedSegments,
         currentSegment: action.payload,
       };
     case ACTIONS.SET_OPTIONS:
@@ -162,6 +167,7 @@ const GameContext = createContext(null);
 export const GameProvider = ({ children }) => {
   const [state, dispatch] = useReducer(gameReducer, initialState);
   const { applyGenreTheme } = useThemeContext();
+  const { showInfo, showError } = useNotification();
   const fetchingGamesRef = useRef(false);
 
   // Action dispatchers
@@ -173,8 +179,22 @@ export const GameProvider = ({ children }) => {
     dispatch({ type: ACTIONS.SET_LOADING_PROGRESS, payload: progress });
   }, []);
 
-  const setError = useCallback((error) => {
-    dispatch({ type: ACTIONS.SET_ERROR, payload: error });
+  const setError = useCallback(
+    (error) => {
+      if (error) {
+        console.error("Game error:", error);
+        // Show error notification for user-friendly errors
+        if (typeof error === "string" && !error.includes("API key")) {
+          showError(error, { timeout: 5000 });
+        }
+      }
+      dispatch({ type: ACTIONS.SET_ERROR, payload: error });
+    },
+    [showError]
+  );
+
+  const clearError = useCallback(() => {
+    dispatch({ type: ACTIONS.CLEAR_ERROR });
   }, []);
 
   const setCurrentGame = useCallback(
@@ -259,7 +279,7 @@ export const GameProvider = ({ children }) => {
       // Skip if already fetching or initialized (unless forced)
       if (fetchingGamesRef.current) {
         console.log("Already fetching games, skipping duplicate request");
-        return [];
+        return state.gameList;
       }
 
       if (state.gamesInitialized && !forceRefresh) {
@@ -290,37 +310,16 @@ export const GameProvider = ({ children }) => {
         }, 200);
 
         // Call the API to get all games
-        const response = await gameService.getAllGames();
-        console.log("Games response received:", response);
+        const games = await gameService.getAllGames();
+        console.log("Games response received:", games);
 
         clearInterval(progressInterval);
         setLoadingProgress(100);
 
-        // Parse the response correctly based on your API structure
-        let gamesData = [];
-
-        // Handle your specific API response format
-        if (
-          response &&
-          response.data &&
-          response.data.data &&
-          Array.isArray(response.data.data)
-        ) {
-          gamesData = response.data.data;
-        }
-        // Fallback checks
-        else if (response && Array.isArray(response.data)) {
-          gamesData = response.data;
-        } else if (Array.isArray(response)) {
-          gamesData = response;
-        }
-
-        console.log(`Found ${gamesData.length} games to display`);
-
         // Short delay before completing to ensure progress bar is visible
         setTimeout(() => {
           // Update state
-          setGameList(gamesData);
+          setGameList(games);
           setGamesInitialized(true);
 
           // Only restore status if we changed it (were browsing)
@@ -331,9 +330,20 @@ export const GameProvider = ({ children }) => {
 
           // Clear fetching flag
           fetchingGamesRef.current = false;
+
+          // Show info notification if we have games
+          if (games && games.length > 0) {
+            showInfo(
+              `Found ${games.length} adventure${games.length !== 1 ? "s" : ""}`,
+              {
+                timeout: 3000,
+                title: "Games Loaded",
+              }
+            );
+          }
         }, 300);
 
-        return gamesData;
+        return games;
       } catch (error) {
         console.error("Error fetching games:", error);
         setError(error.message || "Failed to load games");
@@ -359,6 +369,7 @@ export const GameProvider = ({ children }) => {
       setError,
       setGameList,
       setGamesInitialized,
+      showInfo,
     ]
   );
 
@@ -383,6 +394,9 @@ export const GameProvider = ({ children }) => {
         setStatus("loading");
         setLoadingProgress(0);
 
+        // Clear any previous errors
+        clearError();
+
         // Simulate progressive loading for better UX
         const progressInterval = setInterval(() => {
           setLoadingProgress((prev) => {
@@ -395,53 +409,69 @@ export const GameProvider = ({ children }) => {
         }, 200);
 
         // Call the API to create a new game
-        const response = await gameService.createGame(gameData, state.apiKey);
+        const newGame = await gameService.createGame(gameData, state.apiKey);
 
         clearInterval(progressInterval);
         setLoadingProgress(100);
 
         // Short delay before completing to ensure progress bar is visible
         setTimeout(() => {
-          setCurrentGame(response);
+          setCurrentGame(newGame);
           setStatus("playing");
           resetGameState();
 
           // Apply theme based on game genre
-          applyGenreTheme(response.genre);
+          applyGenreTheme(newGame.genre);
 
           // Add initial log entry
           addLog({
             text: "New adventure started",
             type: "system",
           });
+
+          // Show notification
+          showInfo(`Your ${newGame.genre} adventure awaits!`, {
+            title: "Adventure Created",
+            timeout: 3000,
+          });
         }, 300);
 
-        return response;
+        return newGame;
       } catch (error) {
+        console.error("Error creating game:", error);
         setError(error.message || "Failed to create game");
+        setStatus("creating"); // Go back to creation form
         return null;
+      } finally {
+        clearInterval(progressInterval);
       }
     },
     [
       state.apiKey,
       setStatus,
       setLoadingProgress,
+      clearError,
       setError,
       setCurrentGame,
       resetGameState,
       applyGenreTheme,
       addLog,
+      showInfo,
     ]
   );
 
   const loadGame = useCallback(
     async (gameId) => {
+      // Declare progressInterval at the function scope level so it's available throughout
+      let progressInterval;
+
       try {
         setStatus("loading");
         setLoadingProgress(0);
+        clearError(); // Clear any previous errors
 
         // Simulate progressive loading for better UX
-        const progressInterval = setInterval(() => {
+        progressInterval = setInterval(() => {
           setLoadingProgress((prev) => {
             if (prev >= 90) {
               clearInterval(progressInterval);
@@ -452,51 +482,81 @@ export const GameProvider = ({ children }) => {
         }, 200);
 
         // Call the API to get a specific game
-        const response = await gameService.getGame(gameId);
+        const game = await gameService.getGame(gameId);
 
-        if (!response) {
+        if (!game) {
           throw new Error("Game not found");
         }
 
         clearInterval(progressInterval);
         setLoadingProgress(100);
 
+        console.log("Game loaded:", game);
+
         // Short delay before completing to ensure progress bar is visible
         setTimeout(() => {
-          setCurrentGame(response);
+          setCurrentGame(game);
 
-          // If the game has segments, load them
-          if (response.segments && response.segments.length > 0) {
-            setSegments(response.segments);
-            setCurrentSegment(response.segments[response.segments.length - 1]);
+          // Process game data
+          let segments = [];
+          let currentSegmentData = null;
+          let options = [];
+
+          // If the game has segments in the response, process them
+          if (game.storySegments && game.storySegments.length > 0) {
+            // Sort segments by sequence number
+            segments = [...game.storySegments].sort(
+              (a, b) => a.sequenceNumber - b.sequenceNumber
+            );
+
+            // Set the latest segment as current
+            currentSegmentData = segments[segments.length - 1];
+
+            // If the segment has options, set them
+            if (currentSegmentData && currentSegmentData.options) {
+              options = currentSegmentData.options;
+            }
           }
 
-          // If the game has options, load them
-          if (response.options && response.options.length > 0) {
-            setOptions(response.options);
-          }
-
+          // Update state with game data
+          setSegments(segments);
+          setCurrentSegment(currentSegmentData);
+          setOptions(options);
           setStatus("playing");
 
           // Apply theme based on game genre
-          applyGenreTheme(response.genre);
+          applyGenreTheme(game.genre);
 
           // Add log entry
           addLog({
             text: "Adventure loaded",
             type: "system",
           });
+
+          // Show notification
+          showInfo(`Continuing your ${game.genre} adventure!`, {
+            title: "Adventure Loaded",
+            timeout: 3000,
+          });
         }, 300);
 
-        return response;
+        return game;
       } catch (error) {
+        console.error("Failed to load game:", error);
         setError(error.message || "Failed to load game");
+        setStatus("browsing"); // Go back to game browser
         return null;
+      } finally {
+        // Ensure interval is cleared regardless of success or failure
+        if (progressInterval) {
+          clearInterval(progressInterval);
+        }
       }
     },
     [
       setStatus,
       setLoadingProgress,
+      clearError,
       setError,
       setCurrentGame,
       setSegments,
@@ -504,6 +564,7 @@ export const GameProvider = ({ children }) => {
       setOptions,
       applyGenreTheme,
       addLog,
+      showInfo,
     ]
   );
 
@@ -517,6 +578,7 @@ export const GameProvider = ({ children }) => {
 
         setStatus("loading");
         setLoadingProgress(0);
+        clearError(); // Clear any previous errors
 
         // Simulate progressive loading for better UX
         const progressInterval = setInterval(() => {
@@ -529,16 +591,35 @@ export const GameProvider = ({ children }) => {
           });
         }, 200);
 
+        console.log(`Starting game ${gameId} with API key`);
+
         // Call the API to start the game
         const response = await gameService.startGame(gameId, state.apiKey);
+        console.log("Start game response:", response);
 
         clearInterval(progressInterval);
         setLoadingProgress(100);
 
+        // Extract the data based on the API response structure
+        // Adjust this based on your actual API response structure
+        const gameData = response.data?.game || response.game || response;
+        const firstSegment =
+          response.data?.firstSegment || response.firstSegment;
+        const initialOptions = firstSegment?.options || [];
+
+        // Update the current game with any additional data from the response
+        if (gameData && state.currentGame) {
+          setCurrentGame({
+            ...state.currentGame,
+            ...gameData,
+          });
+        }
+
         // Process and set the initial segment and options
-        if (response && response.currentSegment) {
-          setCurrentSegment(response.currentSegment);
-          setSegments([response.currentSegment]);
+        if (firstSegment) {
+          console.log("Setting initial segment:", firstSegment);
+          setCurrentSegment(firstSegment);
+          setSegments([firstSegment]);
 
           // Add log entry for the initial segment
           addLog({
@@ -547,27 +628,41 @@ export const GameProvider = ({ children }) => {
           });
         }
 
-        if (response && response.options) {
-          setOptions(response.options);
+        if (initialOptions.length > 0) {
+          console.log("Setting initial options:", initialOptions);
+          setOptions(initialOptions);
         }
 
         setStatus("playing");
 
+        // Show notification
+        showInfo("Your adventure begins!", {
+          title: "Story Started",
+          timeout: 3000,
+        });
+
         return response;
       } catch (error) {
+        console.error("Failed to start game:", error);
         setError(error.message || "Failed to start game");
         return null;
+      } finally {
+        clearInterval(progressInterval);
       }
     },
     [
       state.apiKey,
+      state.currentGame,
       setStatus,
       setLoadingProgress,
+      clearError,
       setError,
+      setCurrentGame,
       setCurrentSegment,
       setSegments,
       setOptions,
       addLog,
+      showInfo,
     ]
   );
 
@@ -581,6 +676,7 @@ export const GameProvider = ({ children }) => {
 
         setStatus("loading");
         setLoadingProgress(0);
+        clearError(); // Clear any previous errors
 
         // Log the player's choice
         const choiceText = choiceData.optionId
@@ -605,6 +701,8 @@ export const GameProvider = ({ children }) => {
           });
         }, 200);
 
+        console.log("Creating new story segment with choice:", choiceData);
+
         // Call the API to create a new story segment
         const response = await gameService.createStorySegment(
           gameId,
@@ -612,41 +710,56 @@ export const GameProvider = ({ children }) => {
           state.apiKey
         );
 
+        console.log("Create story segment response:", response);
+
         clearInterval(progressInterval);
         setLoadingProgress(100);
 
-        // Update the current game's turn count
+        // Extract data based on API response structure
+        // Adjust this based on your actual API response structure
+        const gameUpdate = response.data?.game || {};
+        const newSegment =
+          response.data?.segment || response.segment || response;
+        const newOptions = response.data?.options || newSegment?.options || [];
+
+        // Update the current game with turn count
         if (state.currentGame) {
+          const newTurnCount = (state.currentGame.turnCount || 0) + 1;
           setCurrentGame({
             ...state.currentGame,
-            turnCount: (state.currentGame.turnCount || 0) + 1,
+            ...gameUpdate,
+            turnCount: newTurnCount,
           });
         }
 
         // Process and set the new segment and options
-        if (response && response.segment) {
-          addSegment(response.segment);
+        if (newSegment) {
+          addSegment(newSegment);
 
           // Add log entry for the new segment
           addLog({
-            text: response.segment.content.substring(0, 50) + "...",
+            text: newSegment.content.substring(0, 50) + "...",
             type: "story",
           });
         }
 
-        if (response && response.options) {
-          setOptions(response.options);
+        if (newOptions.length > 0) {
+          setOptions(newOptions);
         }
-
-        // Auto-save game state (the API might handle this already)
-        // But we could add an explicit save call here if needed
 
         setStatus("playing");
 
-        return response;
+        return {
+          segment: newSegment,
+          options: newOptions,
+          isSignificantEvent: false, // You could have logic to determine this
+        };
       } catch (error) {
+        console.error("Failed to generate story segment:", error);
         setError(error.message || "Failed to generate story segment");
         return null;
+      } finally {
+        clearInterval(progressInterval);
       }
     },
     [
@@ -655,6 +768,7 @@ export const GameProvider = ({ children }) => {
       state.currentGame,
       setStatus,
       setLoadingProgress,
+      clearError,
       setError,
       setCurrentGame,
       addSegment,
@@ -675,20 +789,35 @@ export const GameProvider = ({ children }) => {
 
         // You could add an explicit save endpoint call here if needed
         // For now, we'll assume the server auto-saves on segment creation
+        console.log(`Saving game ${id}`);
 
-        // Log the save action
-        addLog({
-          text: "Game saved",
-          type: "system",
-        });
+        try {
+          // If you have a saveGame endpoint, call it here
+          // await gameService.saveGame(id);
 
-        return true;
+          // Log the save action
+          addLog({
+            text: "Game saved",
+            type: "system",
+          });
+
+          showInfo("Game progress saved", {
+            title: "Save Complete",
+            timeout: 2000,
+          });
+
+          return true;
+        } catch (saveError) {
+          console.error("Error during game save:", saveError);
+          throw new Error(saveError.message || "Failed to save game");
+        }
       } catch (error) {
+        console.error("Error saving game:", error);
         setError(error.message || "Failed to save game");
         return false;
       }
     },
-    [state.currentGame, setError, addLog]
+    [state.currentGame, setError, addLog, showInfo]
   );
 
   // Context value
@@ -699,6 +828,7 @@ export const GameProvider = ({ children }) => {
     // Status setters
     setStatus,
     setError,
+    clearError,
     setGamesInitialized,
 
     // Game data actions

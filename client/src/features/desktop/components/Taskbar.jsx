@@ -1,3 +1,4 @@
+// src/features/desktop/components/Taskbar.jsx
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import Button from "../../../components/common/Button";
@@ -7,6 +8,7 @@ import NotificationIcon from "../../../components/notifications/NotificationIcon
 import { useAudio } from "../../../contexts/AudioContext";
 import { placeholderIcons } from "../../../utils/iconUtils";
 import MuteButton from "../../../components/common/MuteButton";
+import { win95Border } from "../../../utils/styleUtils";
 
 const TaskbarContainer = styled.div`
   position: absolute;
@@ -57,40 +59,56 @@ const StartButton = styled.button`
 const TaskbarItems = styled.div`
   display: flex;
   flex: 1;
-  padding: 2px;
-  margin-left: 2px;
+  padding: 0 2px;
+  margin: 0 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: 2px;
+  height: 24px;
+
+  /* Hide scrollbar */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+  &::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
 `;
 
 const TaskbarItem = styled.button`
   padding: 0 4px;
-  margin-right: 2px;
   height: 22px;
-  min-width: 150px;
+  min-width: 120px;
   max-width: 200px;
   font-size: 11px;
+  ${win95Border((props) => (props.$active ? "inset" : "outset"))}
   background-color: #c0c0c0;
-  border-top: 1px solid #ffffff;
-  border-left: 1px solid #ffffff;
-  border-right: 1px solid #808080;
-  border-bottom: 1px solid #808080;
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  gap: 5px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   font-family: "ms_sans_serif", sans-serif;
   cursor: pointer;
+  flex-shrink: 0;
 
-  ${({ $active }) =>
-    $active &&
-    `
-    font-weight: bold;
-    border-top: 1px solid #808080;
-    border-left: 1px solid #808080;
-    border-right: 1px solid #ffffff;
-    border-bottom: 1px solid #ffffff;
-  `}
+  &:hover {
+    background-color: ${(props) => (props.$active ? "#c0c0c0" : "#d0d0d0")};
+  }
+`;
+
+const ItemIcon = styled.img`
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+`;
+
+const ItemText = styled.span`
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: ${(props) => (props.$active ? "bold" : "normal")};
 `;
 
 const SystemTray = styled.div`
@@ -98,10 +116,7 @@ const SystemTray = styled.div`
   align-items: center;
   margin: 2px 0;
   background-color: #c0c0c0;
-  border-top: 1px solid #808080;
-  border-left: 1px solid #808080;
-  border-right: 1px solid #ffffff;
-  border-bottom: 1px solid #ffffff;
+  ${win95Border("inset")}
   padding: 0 4px;
   height: 22px;
 `;
@@ -129,20 +144,26 @@ const WindowsLogoImg = styled.img`
   margin-right: 4px;
 `;
 
-const Taskbar = ({
-  isStartMenuOpen,
-  toggleStartMenu,
-  windows = [], // Provide default value
-  activeWindow,
-  onWindowRestore,
-  onWindowFocus,
-  username,
-  onOpenApplication,
-}) => {
-  const { audioSettings, toggleMute, playUISound } = useAudio();
+/**
+ * Taskbar component - Windows 95 style taskbar with start button, task items, and system tray
+ */
+const Taskbar = ({ isStartMenuOpen, toggleStartMenu }) => {
+  const {
+    minimizedWindows,
+    visibleWindows,
+    activeWindowId,
+    restoreWindow,
+    focusWindow,
+  } = useWindowContext();
+
+  const { playUISound } = useAudio();
+  const [time, setTime] = useState(getFormattedTime());
+
+  // Combine all windows to get a complete picture of window state
+  const allWindows = [...visibleWindows, ...minimizedWindows];
 
   // Format current time
-  const getFormattedTime = () => {
+  function getFormattedTime() {
     const now = new Date();
     let hours = now.getHours();
     const minutes = now.getMinutes();
@@ -153,16 +174,47 @@ const Taskbar = ({
     const minutesStr = minutes < 10 ? "0" + minutes : minutes;
 
     return `${hours}:${minutesStr} ${ampm}`;
+  }
+
+  // Get icon for window
+  const getWindowIcon = (window) => {
+    if (!window || !window.icon) {
+      return placeholderIcons.windows;
+    }
+
+    // Handle different icon formats
+    if (typeof window.icon === "string") {
+      if (window.icon.startsWith("http") || window.icon.startsWith("/")) {
+        return window.icon;
+      }
+
+      // If it's an emoji or other string, use default
+      return placeholderIcons.windows;
+    }
+
+    return placeholderIcons.windows;
   };
 
-  // Current time state
-  const [time, setTime] = React.useState(getFormattedTime());
+  // Handle taskbar item click (restore or focus window)
+  const handleTaskbarItemClick = (windowId) => {
+    // Check if window is minimized
+    const window = allWindows.find((w) => w.id === windowId);
+
+    if (window) {
+      if (window.isMinimized) {
+        playUISound("maximize");
+        restoreWindow(windowId);
+      } else {
+        focusWindow(windowId);
+      }
+    }
+  };
 
   // Update clock every minute
-  React.useEffect(() => {
+  useEffect(() => {
     const timer = setInterval(() => {
       setTime(getFormattedTime());
-    }, 60000);
+    }, 30000); // Every 30 seconds to be more reactive
 
     return () => clearInterval(timer);
   }, []);
@@ -174,6 +226,7 @@ const Taskbar = ({
           id="start-button"
           onClick={toggleStartMenu}
           $isOpen={isStartMenuOpen}
+          aria-label="Start menu"
         >
           <WindowsLogoImg src={placeholderIcons.windows} alt="Windows 95" />
           Start
@@ -181,18 +234,21 @@ const Taskbar = ({
       </StartButtonContainer>
 
       <TaskbarItems>
-        {Array.isArray(windows) &&
-          windows
-            .filter((window) => window && window.isMinimized)
-            .map((window) => (
-              <TaskbarItem
-                key={window.id}
-                onClick={() => onWindowRestore && onWindowRestore(window.id)}
-                $active={activeWindow === window.id}
-              >
-                {window.title}
-              </TaskbarItem>
-            ))}
+        {allWindows.map((window) => (
+          <TaskbarItem
+            key={window.id}
+            onClick={() => handleTaskbarItemClick(window.id)}
+            $active={activeWindowId === window.id && !window.isMinimized}
+            title={window.title}
+          >
+            <ItemIcon src={getWindowIcon(window)} alt="" />
+            <ItemText
+              $active={activeWindowId === window.id && !window.isMinimized}
+            >
+              {window.title}
+            </ItemText>
+          </TaskbarItem>
+        ))}
       </TaskbarItems>
 
       <SystemTray>
