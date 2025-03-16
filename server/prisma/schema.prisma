@@ -19,27 +19,10 @@ model User {
   updatedAt         DateTime       @updatedAt
   
   // Relations
-  characters        Character[]
   games             Game[]
   contextConfig     ContextConfig?
-}
 
-model Character {
-  id                Int       @id @default(autoincrement())
-  name              String    @db.VarChar(100)
-  traits            String[]  // Array of character traits
-  bio               String    @db.Text
-  gender            String?   @db.VarChar(20)
-  image             String?   @db.VarChar(255)
-  achievements      Json?     // Stored as JSONB
-  persistentMemories Json?    // Memories spanning multiple games
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  // Relations
-  userId            Int
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  games             Game[]
+  @@index([email])
 }
 
 model Game {
@@ -49,49 +32,41 @@ model Game {
   status           GameStatus     @default(ACTIVE)
   lastPlayedAt     DateTime       @default(now())
   turnCount        Int            @default(0)
-  narrativeStage   NarrativeStage @default(INTRODUCTION)
-  minTurns         Int            @default(7)
-  softMaxTurns     Int            @default(18)
-  hardMaxTurns     Int            @default(25)
+  initialStory     String?        @db.Text
+  totalTurns       Int            @default(16)
   summary          String?        @db.Text
-  endingSummary    Json?          // Detailed ending summary
+  endingSummary    Json?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+  
+  // Story element components
+  narrativeVoice   String?        @db.VarChar(50)
+  pacingTechnique  String?        @db.VarChar(50) 
+  subgenre         String?        @db.VarChar(50)
+  emotionalCore    String?        @db.VarChar(50)
+  settingType      String?        @db.VarChar(50)
+  languageStyle    String?        @db.VarChar(50)
+  choiceDesign     String?        @db.VarChar(50)
+  
+  // Complete story elements configuration
+  storyElements    Json?
   
   // Relations
   userId           Int
   user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  characterId      Int?
-  character        Character?     @relation(fields: [characterId], references: [id], onDelete: SetNull)
   storySegments    StorySegment[]
-  gameItems        GameItem[]
-  gameCharacters   GameCharacter[]
-}
 
-model EntityMention {
-  id               Int       @id @default(autoincrement())
-  entityType       String    @db.VarChar(20)  // "character" or "item"
-  entityId         Int       // ID of the character or item
-  segmentId        Int       // ID of the story segment
-  mentionCount     Int       @default(1)
-  context          String?   @db.Text  // Snippet of text containing the mention
-  stateChange      Boolean   @default(false)  // Was there a state change in this mention?
-  newState         String?   @db.VarChar(50)  // New state (if applicable)
-  createdAt        DateTime  @default(now())
-  
-  // Relations
-  storySegment     StorySegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([status])
+  @@index([genre])
 }
 
 model StorySegment {
   id               Int       @id @default(autoincrement())
   sequenceNumber   Int
+  segmentTitle     String    @db.Text
   content          String    @db.Text
-  userChoice       String?   @db.Text  // Player's choice that led here
-  summary          String?   @db.Text  // Condensed segment summary
-  locationContext  String?   @db.VarChar(100)
-  importance       Int       @default(1)  // Relevance ranking (1-10)
-  vectorId         String?   // Vector database reference (optional)
+  userChoice       String?   @db.Text
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   
@@ -99,13 +74,14 @@ model StorySegment {
   gameId           Int
   game             Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
   options          Option[]
-  entityMentions   EntityMention[]
+
+  @@index([gameId, sequenceNumber])
+  @@unique([gameId, sequenceNumber])
 }
 
 model Option {
   id               Int       @id @default(autoincrement())
   text             String    @db.Text
-  risk             RiskLevel @default(MEDIUM)
   wasChosen        Boolean   @default(false)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -113,59 +89,13 @@ model Option {
   // Relations
   storySegmentId   Int
   storySegment     StorySegment @relation(fields: [storySegmentId], references: [id], onDelete: Cascade)
-}
 
-model GameItem {
-  id               Int       @id @default(autoincrement())
-  name             String    @db.VarChar(100)
-  description      String?   @db.Text
-  acquiredAt       Int       // Turn number when acquired
-  lostAt           Int?      // Turn number when lost (if applicable)
-  properties       Json?     // Additional item properties
-  currentState     String    @default("default") @db.VarChar(50) // Current state (default, broken, consumed, etc.)
-  canonicalId      String?   @db.VarChar(100)    // For linking different representations of the same item
-  stateHistory     Json?     // Array of state changes with timestamps
-  lastMentionedAt  Int?      // Last turn the item was mentioned
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  
-  // Relations
-  gameId           Int
-  game             Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
-}
-
-model GameCharacter {
-  id               Int       @id @default(autoincrement())
-  name             String    @db.VarChar(100)
-  description      String?   @db.Text
-  relationship     String    @default("NEUTRAL") @db.VarChar(50)
-  firstAppearedAt  Int       // Turn number of first appearance
-  lastAppearedAt   Int?      // Turn number of last appearance
-  lastMentionedAt  Int?      // Last turn the character was mentioned
-  importance       Int       @default(5)  // Character importance (1-10)
-  canonicalId      String?   @db.VarChar(100)  // For linking different representations of the same character
-  aliases          String[]  // Array of alternative names/identities
-  stateHistory     Json?     // Array of state/relationship changes with timestamps
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  
-  // Relations
-  gameId           Int
-  game             Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  // Self-relation for identity reveals/relationships
-  originalCharacterId Int?
-  originalCharacter   GameCharacter?  @relation("CharacterIdentities", fields: [originalCharacterId], references: [id])
-  revealedIdentities  GameCharacter[] @relation("CharacterIdentities")
+  @@index([storySegmentId])
 }
 
 model ContextConfig {
   id               Int       @id @default(autoincrement())
-  maxSegments      Int       @default(5)  // Max story segments in context
-  includeItems     Boolean   @default(true)
-  includeCharacters Boolean  @default(true)
-  maxItems         Int       @default(10)
-  maxCharacters    Int       @default(5)
-  useVectorSearch  Boolean   @default(false)
+  maxSegments      Int       @default(16)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   
@@ -178,18 +108,4 @@ enum GameStatus {
   ACTIVE
   COMPLETED
   ABANDONED
-}
-
-enum NarrativeStage {
-  INTRODUCTION
-  RISING_ACTION
-  CLIMAX
-  FALLING_ACTION
-  RESOLUTION
-}
-
-enum RiskLevel {
-  LOW
-  MEDIUM
-  HIGH
 }

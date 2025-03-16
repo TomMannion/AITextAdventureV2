@@ -1,5 +1,56 @@
-# .gitignore
+# Dependencies
 node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Environment variables
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+
+# Build output
 dist/
+build/
+out/
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+.directory
+.project
+.settings/
+
+# Testing
 coverage/
+.nyc_output/
+
+# Prisma
+prisma/migrations/
+*.db
+*.db-journal
+
+# Temporary files
+.tmp/
+tmp/
+*.tmp
+*.temp
+
+# Sensitive files
+*.pem
+*.key
+*.cert
+
+# Specific to this project
+uploads/

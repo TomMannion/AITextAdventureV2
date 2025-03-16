@@ -1,0 +1,119 @@
+/* Windows 95 theme global styling with external font definitions */
+
+@font-face {
+  font-family: 'ms_sans_serif';
+  src: url('/fonts/ms_sans_serif.woff2') format('woff2'),
+       url('/fonts/ms_sans_serif.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ms_sans_serif';
+  src: url('/fonts/ms_sans_serif_bold.woff2') format('woff2'),
+       url('/fonts/ms_sans_serif_bold.woff') format('woff');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Global reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Global font application */
+body, div, p, span, h1, h2, h3, h4, h5, h6, button, input, select, textarea {
+  font-family: 'ms_sans_serif', sans-serif;
+  /* Disable font smoothing for pixelated look */
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: none;
+  font-smoothing: none;
+  /* Use pixelated rendering for authentic Win95 look */
+  text-rendering: optimizeSpeed;
+}
+
+/* Windows 95 theme colors */
+:root {
+  --win95-bg: #008080;
+  --win95-window-bg: #c0c0c0;
+  --win95-window-header: #000080;
+  --win95-text: #000000;
+  --win95-text-light: #ffffff;
+  --win95-border-light: #ffffff;
+  --win95-border-dark: #808080;
+  --win95-border-darker: #000000;
+  --win95-button-face: #c0c0c0;
+  --win95-button-highlight: #ffffff;
+  --win95-button-shadow: #808080;
+  --win95-button-text: #000000;
+  --win95-scrollbar: #c0c0c0;
+  --win95-scrollbar-thumb: #a0a0a0;
+  --win95-desktop-icon-text: #ffffff;
+  --crt-effect-level: 0.5;
+}
+
+/* Core layout */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  background-color: var(--win95-bg);
+}
+
+/* Focus on preventing font flickering during drag operations */
+.dragging * {
+  /* Disable transitions during drag */
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Windows 95 scrollbar styling */
+::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+  background-color: var(--win95-scrollbar);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--win95-scrollbar);
+  border: 1px solid var(--win95-border-darker);
+  border-right-color: var(--win95-border-light);
+  border-bottom-color: var(--win95-border-light);
+}
+
+::-webkit-scrollbar-button {
+  background-color: var(--win95-scrollbar);
+  border: 1px solid var(--win95-border-darker);
+  border-right-color: var(--win95-border-light);
+  border-bottom-color: var(--win95-border-light);
+  width: 16px;
+  height: 16px;
+}
+
+::-webkit-scrollbar-corner {
+  background-color: var(--win95-scrollbar);
+}
+
+/* Disable CRT effect if needed */
+.crt-effect-disabled .crt-screen {
+  animation: none !important;
+  filter: none !important;
+}
+
+.crt-effect-disabled .crt-scanlines,
+.crt-effect-disabled .crt-glow {
+  display: none !important;
+}
+
+/* Ensure proper button rendering */
+button {
+  font-family: 'ms_sans_serif', sans-serif !important;
+  font-size: 11px;
+}

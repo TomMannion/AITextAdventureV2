@@ -1,129 +1,69 @@
-// src/App.jsx
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { lazy, Suspense } from "react";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import Navbar from "./components/Navbar";
-import "./App.css";
+// src/App.jsx - Updated with router-based authentication and notification support
+import React from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import { WindowProvider } from "./contexts/WindowContext";
+import { GameProvider } from "./contexts/GameContext";
+import { AuthProvider } from "./contexts/AuthContext";
+import { AudioProvider } from "./contexts/AudioContext";
+import { NotificationProvider } from "./contexts/NotificationContext";
+import NotificationContainer from "./components/notifications/NotificationContainer";
+import DesktopContent from "./features/desktop/Desktop";
+import LoginForm from "./features/auth/components/LoginForm";
+import RegisterForm from "./features/auth/components/RegisterForm";
+import ProtectedRoute from "./components/common/ProtectedRoute";
 
-// Lazy load components
-const AuthPage = lazy(() => import("./pages/AuthPage"));
-const GameListPage = lazy(() => import("./pages/GameListPage"));
-const GamePage = lazy(() => import("./pages/GamePage"));
-
-// Character pages
-const CharactersPage = lazy(() => import("./pages/CharactersPage"));
-const CharacterDetailPage = lazy(() => import("./pages/CharacterDetailPage"));
-const CharacterCreatePage = lazy(() => import("./pages/CharacterCreatePage"));
-const CharacterEditPage = lazy(() => import("./pages/CharacterEditPage"));
-
-// Protected route wrapper
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
-
-  if (loading) {
-    return <div className="loading-screen">Loading...</div>;
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  return children;
-};
-
-// Auth wrapper component
-const AuthWrapper = ({ children }) => {
-  const { isAuthenticated } = useAuth();
-
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
-  return children;
-};
-
-function App() {
+// App component using React Router
+const App = () => {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <div className="app">
-          <Navbar />
-          <main className="content">
-            <Suspense
-              fallback={<div className="loading-screen">Loading...</div>}
-            >
-              <Routes>
-                {/* Auth route */}
-                <Route
-                  path="/auth"
-                  element={
-                    <AuthWrapper>
-                      <AuthPage />
-                    </AuthWrapper>
-                  }
-                />
+    <AudioProvider>
+      <ThemeProvider>
+        <NotificationProvider>
+          <WindowProvider>
+            <AuthProvider>
+              <GameProvider>
+                {/* Global notification container */}
+                <NotificationContainer />
 
-                {/* Game routes */}
-                <Route
-                  path="/"
-                  element={
-                    <ProtectedRoute>
-                      <GameListPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/games/:id"
-                  element={
-                    <ProtectedRoute>
-                      <GamePage />
-                    </ProtectedRoute>
-                  }
-                />
+                <Router>
+                  <Routes>
+                    {/* Public routes */}
+                    <Route path="/login" element={<LoginForm />} />
+                    <Route path="/register" element={<RegisterForm />} />
 
-                {/* Character routes */}
-                <Route
-                  path="/characters"
-                  element={
-                    <ProtectedRoute>
-                      <CharactersPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/characters/new"
-                  element={
-                    <ProtectedRoute>
-                      <CharacterCreatePage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/characters/:id"
-                  element={
-                    <ProtectedRoute>
-                      <CharacterDetailPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/characters/:id/edit"
-                  element={
-                    <ProtectedRoute>
-                      <CharacterEditPage />
-                    </ProtectedRoute>
-                  }
-                />
+                    {/* Protected routes */}
+                    <Route
+                      path="/desktop"
+                      element={
+                        <ProtectedRoute>
+                          <DesktopContent />
+                        </ProtectedRoute>
+                      }
+                    />
 
-                {/* Catch-all route */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Suspense>
-          </main>
-        </div>
-      </BrowserRouter>
-    </AuthProvider>
+                    {/* Default route redirects to login */}
+                    <Route
+                      path="/"
+                      element={<Navigate to="/login" replace />}
+                    />
+                    <Route
+                      path="*"
+                      element={<Navigate to="/login" replace />}
+                    />
+                  </Routes>
+                </Router>
+              </GameProvider>
+            </AuthProvider>
+          </WindowProvider>
+        </NotificationProvider>
+      </ThemeProvider>
+    </AudioProvider>
   );
-}
+};
 
 export default App;
