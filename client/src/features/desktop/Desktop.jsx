@@ -1,3 +1,4 @@
+// src/features/desktop/Desktop.jsx - Updated to support settings window
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import DesktopBackground from "./components/DesktopBackground";
@@ -6,6 +7,7 @@ import Taskbar from "./components/Taskbar";
 import StartMenu from "./components/StartMenu";
 import WindowSystem, { useWindowSystem } from "../window-system/WindowSystem";
 import registerApplicationWindows from "./registerWindows";
+import { openSettings } from "../settings/SettingsModule"; // Import the settings helper
 
 const DesktopContainer = styled.div`
   width: 100vw;
@@ -23,7 +25,8 @@ const DesktopContent = ({ username = "User" }) => {
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
 
   // Get window system functions - this works now because we're inside the provider
-  const { openWindow } = useWindowSystem();
+  const windowContext = useWindowSystem();
+  const { openWindow } = windowContext;
 
   // Register application windows on first render
   // Use a ref to ensure it only runs once
@@ -57,10 +60,11 @@ const DesktopContent = ({ username = "User" }) => {
       case "sample-app":
         openWindow("sample-app", { name: username });
         break;
-      case "my-documents":
-        // Will be implemented later
-        break;
       case "settings":
+        // Open the settings window using our helper
+        openSettings(windowContext);
+        break;
+      case "my-documents":
         // Will be implemented later
         break;
       case "recycle-bin":
@@ -85,7 +89,8 @@ const DesktopContent = ({ username = "User" }) => {
         openWindow("text-adventure");
         break;
       case "settings":
-        // Will be implemented later
+        // Open the settings window using our helper
+        openSettings(windowContext);
         break;
       case "shutdown":
         // Will be implemented later

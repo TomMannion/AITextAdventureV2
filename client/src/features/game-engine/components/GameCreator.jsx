@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import useGameState from "../hooks/useGameState";
+import { useSettings } from "../../../contexts/SettingsContext";
 import Button from "../../../components/common/Button";
 import Text from "../../../components/common/Text";
 import { win95Border } from "../../../utils/styleUtils";
@@ -194,20 +195,48 @@ const GameCreator = () => {
     validateApiKey,
   } = useGameState();
 
+  // Get settings from context
+  const { settings } = useSettings();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [localKey, setLocalKey] = useState(apiKey || "");
+
+  // Use LLM settings from context instead of separate state
+  const [localKey, setLocalKey] = useState(apiKey || settings.llm.apiKey || "");
   const [saveKey, setSaveKey] = useState(
-    localStorage.getItem("game_save_api_key") === "true"
+    settings.llm.saveApiKey ||
+      localStorage.getItem("game_save_api_key") === "true"
   );
+
   const [validationError, setValidationError] = useState("");
 
-  // Get current genre info
-  const currentGenre = genreInfo[newGameSettings.genre] || genreInfo.fantasy;
+  // Use LLM provider and model from settings
+  const [provider, setProvider] = useState(settings.llm.provider);
+  const [model, setModel] = useState(settings.llm.model);
 
-  // Update local state when context changes
+  // Update state when settings change
   useEffect(() => {
-    setLocalKey(apiKey || "");
-  }, [apiKey]);
+    setLocalKey(apiKey || settings.llm.apiKey || "");
+    setSaveKey(settings.llm.saveApiKey);
+    setProvider(settings.llm.provider);
+    setModel(settings.llm.model);
+  }, [apiKey, settings.llm]);
+
+  // Use default genre and length from settings
+  useEffect(() => {
+    if (settings.game.defaultGenre && newGameSettings.genre === "fantasy") {
+      setGameGenre(settings.game.defaultGenre);
+    }
+
+    if (settings.game.defaultLength && newGameSettings.totalTurns === 16) {
+      setGameLength(settings.game.defaultLength.toString());
+    }
+  }, [
+    settings.game,
+    newGameSettings.genre,
+    newGameSettings.totalTurns,
+    setGameGenre,
+    setGameLength,
+  ]);
 
   // Handle API key change
   const handleApiKeyChange = (e) => {
@@ -220,6 +249,50 @@ const GameCreator = () => {
     const checked = e.target.checked;
     setSaveKey(checked);
     toggleSaveApiKey(checked);
+  };
+
+  // Handle provider change
+  const handleProviderChange = (e) => {
+    setProvider(e.target.value);
+  };
+
+  // Handle model change
+  const handleModelChange = (e) => {
+    setModel(e.target.value);
+  };
+
+  // Get available models for the selected provider
+  const getModelsForProvider = (provider) => {
+    switch (provider) {
+      case "groq":
+        return [
+          { value: "llama-3.1-8b-instant", label: "LLaMA 3.1 8B Instant" },
+          { value: "llama-3.1-70b-instant", label: "LLaMA 3.1 70B Instant" },
+          { value: "mixtral-8x7b-32768", label: "Mixtral 8x7B-32768" },
+        ];
+      case "anthropic":
+        return [
+          { value: "claude-3-opus-20240229", label: "Claude 3 Opus" },
+          { value: "claude-3-sonnet-20240229", label: "Claude 3 Sonnet" },
+          { value: "claude-3-haiku-20240307", label: "Claude 3 Haiku" },
+          { value: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
+        ];
+      case "openai":
+        return [
+          { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
+          { value: "gpt-4", label: "GPT-4" },
+          { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
+          { value: "gpt-4o", label: "GPT-4o" },
+        ];
+      case "gemini":
+        return [
+          { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+          { value: "gemini-2.0-pro", label: "Gemini 2.0 Pro" },
+          { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
+        ];
+      default:
+        return [{ value: "", label: "Select a provider first" }];
+    }
   };
 
   // Handle form submission
@@ -246,8 +319,11 @@ const GameCreator = () => {
     setValidationError("");
     setIsSubmitting(true);
 
-    // Attempt to create game
-    const result = await submitNewGame();
+    // Attempt to create game with provider and model preferences
+    const result = await submitNewGame({
+      preferredProvider: provider,
+      preferredModel: model,
+    });
 
     // The status will be handled by the context if successful
     // Only need to handle the case where we return here due to an error
@@ -321,6 +397,37 @@ const GameCreator = () => {
 
         <FormSection>
           <SectionTitle>API Settings</SectionTitle>
+
+          <FormGroup>
+            <Label htmlFor="provider">LLM Provider:</Label>
+            <Select
+              id="provider"
+              value={provider}
+              onChange={handleProviderChange}
+            >
+              <option value="groq">Groq</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+              <option value="gemini">Google (Gemini)</option>
+            </Select>
+            <Text size="11px" margin="5px 0 0 0" color="#666666">
+              Select which AI provider to use for story generation
+            </Text>
+          </FormGroup>
+
+          <FormGroup>
+            <Label htmlFor="model">Model:</Label>
+            <Select id="model" value={model} onChange={handleModelChange}>
+              {getModelsForProvider(provider).map((model) => (
+                <option key={model.value} value={model.value}>
+                  {model.label}
+                </option>
+              ))}
+            </Select>
+            <Text size="11px" margin="5px 0 0 0" color="#666666">
+              Choose which AI model to use for your adventure
+            </Text>
+          </FormGroup>
 
           <FormGroup>
             <Label htmlFor="apiKey">LLM API Key:</Label>

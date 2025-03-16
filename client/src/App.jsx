@@ -1,4 +1,4 @@
-// src/App.jsx - Updated with router-based authentication and notification support
+// src/App.jsx - Updated with SettingsProvider
 import React from "react";
 import {
   BrowserRouter as Router,
@@ -12,11 +12,14 @@ import { GameProvider } from "./contexts/GameContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { AudioProvider } from "./contexts/AudioContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
+import { SettingsProvider } from "./contexts/SettingsContext"; // Add SettingsProvider
+
 import NotificationContainer from "./components/notifications/NotificationContainer";
 import DesktopContent from "./features/desktop/Desktop";
 import LoginForm from "./features/auth/components/LoginForm";
 import RegisterForm from "./features/auth/components/RegisterForm";
 import ProtectedRoute from "./components/common/ProtectedRoute";
+import SettingsModule from "./features/settings/SettingsModule"; // Add SettingsModule
 
 // App component using React Router
 const App = () => {
@@ -26,38 +29,45 @@ const App = () => {
         <NotificationProvider>
           <WindowProvider>
             <AuthProvider>
-              <GameProvider>
-                {/* Global notification container */}
-                <NotificationContainer />
+              <SettingsProvider>
+                {" "}
+                {/* Add SettingsProvider */}
+                <GameProvider>
+                  {/* Global notification container */}
+                  <NotificationContainer />
 
-                <Router>
-                  <Routes>
-                    {/* Public routes */}
-                    <Route path="/login" element={<LoginForm />} />
-                    <Route path="/register" element={<RegisterForm />} />
+                  {/* Settings Module - registers settings with window system */}
+                  <SettingsModule />
 
-                    {/* Protected routes */}
-                    <Route
-                      path="/desktop"
-                      element={
-                        <ProtectedRoute>
-                          <DesktopContent />
-                        </ProtectedRoute>
-                      }
-                    />
+                  <Router>
+                    <Routes>
+                      {/* Public routes */}
+                      <Route path="/login" element={<LoginForm />} />
+                      <Route path="/register" element={<RegisterForm />} />
 
-                    {/* Default route redirects to login */}
-                    <Route
-                      path="/"
-                      element={<Navigate to="/login" replace />}
-                    />
-                    <Route
-                      path="*"
-                      element={<Navigate to="/login" replace />}
-                    />
-                  </Routes>
-                </Router>
-              </GameProvider>
+                      {/* Protected routes */}
+                      <Route
+                        path="/desktop"
+                        element={
+                          <ProtectedRoute>
+                            <DesktopContent />
+                          </ProtectedRoute>
+                        }
+                      />
+
+                      {/* Default route redirects to login */}
+                      <Route
+                        path="/"
+                        element={<Navigate to="/login" replace />}
+                      />
+                      <Route
+                        path="*"
+                        element={<Navigate to="/login" replace />}
+                      />
+                    </Routes>
+                  </Router>
+                </GameProvider>
+              </SettingsProvider>
             </AuthProvider>
           </WindowProvider>
         </NotificationProvider>
