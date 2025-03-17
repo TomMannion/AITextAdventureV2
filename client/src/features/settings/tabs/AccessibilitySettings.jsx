@@ -1,5 +1,5 @@
 // src/features/settings/tabs/AccessibilitySettings.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import { win95Border } from "../../../utils/styleUtils";
 import Text from "../../../components/common/Text";
@@ -63,24 +63,27 @@ const AccessibilitySettings = () => {
     setLocalSettings(settings.accessibility);
   }, [settings.accessibility]);
 
-  // Save changes to context
-  const saveChanges = () => {
-    updateSettings("accessibility", localSettings);
-  };
-
   // Handle checkbox change
-  const handleChange = (e) => {
-    const { name, checked } = e.target;
-    setLocalSettings((prev) => ({
-      ...prev,
-      [name]: checked,
-    }));
-  };
+  const handleChange = useCallback(
+    (e) => {
+      const { name, checked } = e.target;
 
-  // Automatically save changes when checkboxes change
-  useEffect(() => {
-    saveChanges();
-  }, [localSettings]);
+      setLocalSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          [name]: checked,
+        };
+
+        // Update context directly here, after a short timeout to prevent circular updates
+        setTimeout(() => {
+          updateSettings("accessibility", newSettings);
+        }, 0);
+
+        return newSettings;
+      });
+    },
+    [updateSettings]
+  );
 
   return (
     <div>

@@ -5,25 +5,25 @@ const DEFAULT_ICONS = [
   {
     id: "text-adventure",
     name: "Text Adventure",
-    icon: "🧙", // Use your actual icon path
+    icon: "/icons/TextAdventure.ico", // Use your actual icon path
     position: { x: 20, y: 20 },
   },
   {
     id: "my-documents",
     name: "My Documents",
-    icon: "/icons/documents.ico",
+    icon: "/icons/DocumentsFolder.ico",
     position: { x: 20, y: 120 },
   },
   {
     id: "settings",
     name: "Settings",
-    icon: "/icons/settings.ico",
+    icon: "/icons/Settings.ico",
     position: { x: 20, y: 220 },
   },
   {
     id: "recycle-bin",
     name: "Recycle Bin",
-    icon: "/icons/recycle-bin.ico",
+    icon: "/icons/RecycleBinWithDocument.ico",
     position: { x: 20, y: 320 },
   },
 ];

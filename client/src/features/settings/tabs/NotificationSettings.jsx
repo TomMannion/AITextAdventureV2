@@ -1,5 +1,5 @@
 // src/features/settings/tabs/NotificationSettings.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import { win95Border } from "../../../utils/styleUtils";
 import Text from "../../../components/common/Text";
@@ -144,39 +144,55 @@ const NotificationSettings = () => {
     setLocalSettings(settings.notifications);
   }, [settings.notifications]);
 
-  // Save changes to context
-  const saveChanges = () => {
-    updateSettings("notifications", localSettings);
-  };
-
   // Handle checkbox change
-  const handleCheckboxChange = (e) => {
-    const { name, checked } = e.target;
-    setLocalSettings((prev) => ({
-      ...prev,
-      [name]: checked,
-    }));
-  };
+  const handleCheckboxChange = useCallback(
+    (e) => {
+      const { name, checked } = e.target;
+
+      setLocalSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          [name]: checked,
+        };
+
+        // Update context after a slight delay
+        setTimeout(() => {
+          updateSettings("notifications", newSettings);
+        }, 0);
+
+        return newSettings;
+      });
+    },
+    [updateSettings]
+  );
 
   // Handle slider change
-  const handleSliderChange = (e) => {
-    const { name, value } = e.target;
-    setLocalSettings((prev) => ({
-      ...prev,
-      [name]: parseInt(value, 10),
-    }));
-  };
+  const handleSliderChange = useCallback(
+    (e) => {
+      const { name, value } = e.target;
+
+      setLocalSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          [name]: parseInt(value, 10),
+        };
+
+        // Update context after a slight delay
+        setTimeout(() => {
+          updateSettings("notifications", newSettings);
+        }, 0);
+
+        return newSettings;
+      });
+    },
+    [updateSettings]
+  );
 
   // Format duration for display
   const formatDuration = (ms) => {
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(1)}s`;
   };
-
-  // Automatically save changes when fields change
-  useEffect(() => {
-    saveChanges();
-  }, [localSettings]);
 
   // Determine if notifications are completely disabled
   const notificationsDisabled = !localSettings.enabled;

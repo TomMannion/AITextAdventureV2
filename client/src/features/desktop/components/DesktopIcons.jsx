@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import DesktopIcon from "./DesktopIcon";
 import useDesktopIcons from "../hooks/useDesktopIcons";
@@ -33,21 +33,27 @@ const DesktopIcons = ({ onIconOpen }) => {
   const {
     icons,
     selectedIconId,
-    draggedIconId,
     selectIcon,
     clearSelection,
+    updateIconPosition,
     startDragging,
     endDragging,
-    updateIconPosition,
   } = useDesktopIcons();
 
-  // Reference to track mouse position during drag
+  // State to track viewport dimensions
+  const [viewport, setViewport] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight - 28, // Subtract taskbar height
+  });
+
+  // Use a ref to track drag state
   const dragRef = useRef({
+    isDragging: false,
+    iconId: null,
     startX: 0,
     startY: 0,
     iconStartX: 0,
     iconStartY: 0,
-    isDragging: false,
   });
 
   // Handle background click to clear selection
@@ -70,74 +76,122 @@ const DesktopIcons = ({ onIconOpen }) => {
     }
   };
 
-  // Setup mouse event handlers for dragging
+  // Handle window resize to update viewport dimensions
   useEffect(() => {
-    const handleMouseDown = (e) => {
-      // Only process if we're dragging an icon
-      if (!draggedIconId) return;
-
-      const icon = icons.find((icon) => icon.id === draggedIconId);
-      if (!icon) return;
-
-      dragRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
-        iconStartX: icon.position.x,
-        iconStartY: icon.position.y,
-        isDragging: true,
-      };
-
-      // Add dragging class to document
-      document.body.classList.add("dragging");
+    const handleResize = () => {
+      setViewport({
+        width: window.innerWidth,
+        height: window.innerHeight - 28, // Subtract taskbar height
+      });
     };
 
-    const handleMouseMove = (e) => {
-      if (!dragRef.current.isDragging) return;
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
-      // Calculate new position
-      const newX = Math.max(
-        0,
-        dragRef.current.iconStartX + (e.clientX - dragRef.current.startX)
-      );
-      const newY = Math.max(
-        0,
-        dragRef.current.iconStartY + (e.clientY - dragRef.current.startY)
-      );
+  // Ensure icons stay within viewport boundaries when screen size changes
+  useEffect(() => {
+    if (icons && icons.length > 0) {
+      icons.forEach((icon) => {
+        // Check if icon is outside the viewport
+        const iconWidth = 80; // Approximate width of icon
+        const iconHeight = 90; // Approximate height of icon
+        let newX = icon.position.x;
+        let newY = icon.position.y;
+        let needsUpdate = false;
 
-      // Update icon position
-      updateIconPosition(draggedIconId, newX, newY);
-    };
+        // Check if off right side of screen
+        if (newX + iconWidth > viewport.width - 20) {
+          newX = viewport.width - iconWidth - 20;
+          needsUpdate = true;
+        }
 
-    const handleMouseUp = () => {
-      if (dragRef.current.isDragging) {
-        dragRef.current.isDragging = false;
-        endDragging();
+        // Check if off bottom of screen
+        if (newY + iconHeight > viewport.height - 20) {
+          newY = viewport.height - iconHeight - 20;
+          needsUpdate = true;
+        }
 
-        // Remove dragging class
-        document.body.classList.remove("dragging");
-      }
-    };
-
-    // Add event listeners
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      // Remove event listeners
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [draggedIconId, icons, endDragging, updateIconPosition]);
+        // Update if needed
+        if (needsUpdate) {
+          updateIconPosition(icon.id, newX, newY);
+        }
+      });
+    }
+  }, [viewport, icons, updateIconPosition]);
 
   // Handle icon mouse down for dragging
   const handleIconMouseDown = (e, iconId) => {
-    // Prevent default behavior
     e.preventDefault();
+    e.stopPropagation();
 
-    // Start dragging
+    // Find the icon
+    const icon = icons.find((i) => i.id === iconId);
+    if (!icon) return;
+
+    // Set up drag data
+    dragRef.current = {
+      isDragging: true,
+      iconId: iconId,
+      startX: e.clientX,
+      startY: e.clientY,
+      iconStartX: icon.position.x,
+      iconStartY: icon.position.y,
+    };
+
+    // Select the icon and start dragging
+    selectIcon(iconId);
     startDragging(iconId);
 
-    // Initial drag state is set in the handleMouseDown effect
+    // Add dragging class to body
+    document.body.classList.add("dragging");
+
+    // Add document-level event listeners
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  };
+
+  // Handle mouse move for dragging
+  const handleMouseMove = (e) => {
+    const drag = dragRef.current;
+    if (!drag.isDragging) return;
+
+    // Calculate new position
+    const deltaX = e.clientX - drag.startX;
+    const deltaY = e.clientY - drag.startY;
+
+    const newX = Math.max(0, drag.iconStartX + deltaX);
+    const newY = Math.max(0, drag.iconStartY + deltaY);
+
+    // Constrain to viewport boundaries
+    const iconWidth = 80;
+    const iconHeight = 90;
+    const maxX = viewport.width - iconWidth - 20;
+    const maxY = viewport.height - iconHeight - 20;
+    const constrainedX = Math.min(newX, maxX);
+    const constrainedY = Math.min(newY, maxY);
+
+    // Update the icon position
+    updateIconPosition(drag.iconId, constrainedX, constrainedY);
+  };
+
+  // Handle mouse up to end dragging
+  const handleMouseUp = () => {
+    const drag = dragRef.current;
+    if (!drag.isDragging) return;
+
+    // Reset drag state
+    dragRef.current.isDragging = false;
+
+    // End the dragging operation
+    endDragging();
+
+    // Remove dragging class
+    document.body.classList.remove("dragging");
+
+    // Remove event listeners
+    document.removeEventListener("mousemove", handleMouseMove);
+    document.removeEventListener("mouseup", handleMouseUp);
   };
 
   return (

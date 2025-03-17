@@ -12,7 +12,7 @@ const registerGameWindows = () => {
     title: "Text Adventure Game",
     width: 800,
     height: 600,
-    icon: "🧙", // This would be a proper icon path in production
+    icon: "/icons/TextAdventure",
     placement: placementStrategies.CENTER,
   });
 

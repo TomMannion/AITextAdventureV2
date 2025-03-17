@@ -1,5 +1,5 @@
 // src/features/settings/tabs/LLMSettings.jsx
-import React, { useState, useEffect, useCallback } from "react"; // Add useCallback import
+import React, { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import { win95Border } from "../../../utils/styleUtils";
 import Text from "../../../components/common/Text";
@@ -100,12 +100,7 @@ const LLMSettings = () => {
     setLocalSettings(settings.llm);
   }, [settings.llm]);
 
-  // Save changes to context
-  const saveChanges = useCallback(() => {
-    updateSettings("llm", localSettings);
-  }, [updateSettings, localSettings]);
-
-  // Handle change with controlled debounce
+  // Handle changes with debounce
   const handleChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
     const newValue = type === "checkbox" ? checked : value;
@@ -127,14 +122,14 @@ const LLMSettings = () => {
     });
   }, []);
 
-  // Use debounced effect for saving changes instead of immediate save
+  // Use debounced effect for saving changes
   useEffect(() => {
     const timer = setTimeout(() => {
-      saveChanges();
-    }, 500); // Debounce for 500ms
+      updateSettings("llm", localSettings);
+    }, 300); // 300ms debounce
 
     return () => clearTimeout(timer);
-  }, [localSettings, saveChanges]);
+  }, [localSettings, updateSettings]);
 
   // Get default model for a provider
   const getDefaultModelForProvider = (provider) => {
@@ -234,7 +229,7 @@ const LLMSettings = () => {
   };
 
   // Test API key
-  const handleTestApiKey = async () => {
+  const handleTestApiKey = useCallback(() => {
     setTestStatus("loading");
     setTestMessage("Testing connection to provider...");
 
@@ -257,11 +252,11 @@ const LLMSettings = () => {
       setTestStatus("success");
       setTestMessage("Connection successful! API key appears to be valid.");
     }, 1500);
-  };
+  }, [localSettings.apiKey]);
 
   return (
     <div>
-      <Text size="16px" bold $margin="0 0 15px 0">
+      <Text size="16px" bold margin="0 0 15px 0">
         LLM Provider Settings
       </Text>
 
@@ -367,7 +362,7 @@ const LLMSettings = () => {
           token limits, pricing, and features.
         </Text>
 
-        <Text size="12px" $margin="10px 0 0 0">
+        <Text size="12px" margin="10px 0 0 0">
           To obtain an API key, visit:
         </Text>
 

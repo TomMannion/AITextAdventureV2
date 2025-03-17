@@ -1,5 +1,5 @@
 // src/features/settings/tabs/GameSettings.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import { win95Border } from "../../../utils/styleUtils";
 import Text from "../../../components/common/Text";
@@ -138,42 +138,71 @@ const GameSettings = () => {
     setLocalSettings(settings.game);
   }, [settings.game]);
 
-  // Save changes to context
-  const saveChanges = () => {
-    updateSettings("game", localSettings);
-  };
-
   // Handle checkbox change
-  const handleCheckboxChange = (e) => {
-    const { name, checked } = e.target;
-    setLocalSettings((prev) => ({
-      ...prev,
-      [name]: checked,
-    }));
-  };
+  const handleCheckboxChange = useCallback(
+    (e) => {
+      const { name, checked } = e.target;
+
+      setLocalSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          [name]: checked,
+        };
+
+        // Update context with a slight delay
+        setTimeout(() => {
+          updateSettings("game", newSettings);
+        }, 0);
+
+        return newSettings;
+      });
+    },
+    [updateSettings]
+  );
 
   // Handle select change
-  const handleSelectChange = (e) => {
-    const { name, value } = e.target;
-    setLocalSettings((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+  const handleSelectChange = useCallback(
+    (e) => {
+      const { name, value } = e.target;
+
+      setLocalSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          [name]: value,
+        };
+
+        // Update context
+        setTimeout(() => {
+          updateSettings("game", newSettings);
+        }, 0);
+
+        return newSettings;
+      });
+    },
+    [updateSettings]
+  );
 
   // Handle slider change
-  const handleSliderChange = (e) => {
-    const { name, value } = e.target;
-    setLocalSettings((prev) => ({
-      ...prev,
-      [name]: parseInt(value, 10),
-    }));
-  };
+  const handleSliderChange = useCallback(
+    (e) => {
+      const { name, value } = e.target;
 
-  // Automatically save changes when fields change
-  useEffect(() => {
-    saveChanges();
-  }, [localSettings]);
+      setLocalSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          [name]: parseInt(value, 10),
+        };
+
+        // Update context
+        setTimeout(() => {
+          updateSettings("game", newSettings);
+        }, 0);
+
+        return newSettings;
+      });
+    },
+    [updateSettings]
+  );
 
   // Get description for the selected genre
   const getGenreDescription = (genre) => {

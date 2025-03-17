@@ -1,12 +1,12 @@
 // src/features/settings/tabs/DisplaySettings.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import { win95Border } from "../../../utils/styleUtils";
 import Text from "../../../components/common/Text";
 import { useSettings } from "../../../contexts/SettingsContext";
 import { useThemeContext } from "../../../contexts/ThemeContext";
 
-// Styled components
+// Styled components remain the same...
 const SettingsSection = styled.div`
   ${win95Border("outset")}
   padding: 15px;
@@ -161,51 +161,95 @@ const DisplaySettings = () => {
     setLocalSettings(settings.display);
   }, [settings.display]);
 
-  // Save changes to context
-  const saveChanges = () => {
-    updateSettings("display", localSettings);
-  };
+  // Apply theme based on the selected theme value
+  const applyTheme = useCallback(
+    (themeValue) => {
+      console.log(`Applying theme: ${themeValue}`);
+
+      // Handle specific themes
+      if (themeValue === "win95") {
+        applySpecificTheme("win95");
+      } else if (themeValue === "highContrast") {
+        applySpecificTheme("highContrast");
+      }
+      // Handle genre themes
+      else if (genreThemes.includes(themeValue)) {
+        applyGenreTheme(themeValue);
+      }
+    },
+    [applySpecificTheme, applyGenreTheme]
+  );
 
   // Handle checkbox change
-  const handleCheckboxChange = (e) => {
-    const { name, checked } = e.target;
-    setLocalSettings((prev) => ({
-      ...prev,
-      [name]: checked,
-    }));
-  };
+  const handleCheckboxChange = useCallback(
+    (e) => {
+      const { name, checked } = e.target;
+
+      setLocalSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          [name]: checked,
+        };
+
+        // Update context directly with a slight delay
+        setTimeout(() => {
+          updateSettings("display", newSettings);
+        }, 0);
+
+        return newSettings;
+      });
+    },
+    [updateSettings]
+  );
 
   // Handle select change
-  const handleSelectChange = (e) => {
-    const { name, value } = e.target;
-    setLocalSettings((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  const handleSelectChange = useCallback(
+    (e) => {
+      const { name, value } = e.target;
 
-    // Apply theme change immediately
-    if (name === "theme") {
-      if (value === "win95") {
-        applySpecificTheme("win95");
-      } else if (genreThemes.includes(value)) {
-        applyGenreTheme(value);
+      setLocalSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          [name]: value,
+        };
+
+        // Update context
+        setTimeout(() => {
+          updateSettings("display", newSettings);
+        }, 0);
+
+        return newSettings;
+      });
+
+      // Apply theme change immediately if this is the theme select
+      if (name === "theme") {
+        applyTheme(value);
       }
-    }
-  };
+    },
+    [updateSettings, applyTheme]
+  );
 
   // Handle slider change
-  const handleSliderChange = (e) => {
-    const { name, value } = e.target;
-    setLocalSettings((prev) => ({
-      ...prev,
-      [name]: parseFloat(value),
-    }));
-  };
+  const handleSliderChange = useCallback(
+    (e) => {
+      const { name, value } = e.target;
 
-  // Automatically save changes when fields change
-  useEffect(() => {
-    saveChanges();
-  }, [localSettings]);
+      setLocalSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          [name]: parseFloat(value),
+        };
+
+        // Update context
+        setTimeout(() => {
+          updateSettings("display", newSettings);
+        }, 0);
+
+        return newSettings;
+      });
+    },
+    [updateSettings]
+  );
 
   // Available themes
   const themes = [
@@ -217,19 +261,27 @@ const DisplaySettings = () => {
   const genreThemes = ["fantasy", "scifi", "horror", "mystery", "western"];
 
   // Select a theme from the theme grid
-  const handleThemeSelect = (themeValue) => {
-    setLocalSettings((prev) => ({
-      ...prev,
-      theme: themeValue,
-    }));
+  const handleThemeSelect = useCallback(
+    (themeValue) => {
+      setLocalSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          theme: themeValue,
+        };
 
-    // Apply theme change immediately
-    if (themeValue === "win95") {
-      applySpecificTheme("win95");
-    } else if (genreThemes.includes(themeValue)) {
-      applyGenreTheme(themeValue);
-    }
-  };
+        // Update context
+        setTimeout(() => {
+          updateSettings("display", newSettings);
+        }, 0);
+
+        return newSettings;
+      });
+
+      // Apply theme change immediately
+      applyTheme(themeValue);
+    },
+    [updateSettings, applyTheme]
+  );
 
   // Get color for a genre theme
   const getGenreColor = (genre) => {

@@ -57,9 +57,6 @@ const DesktopContent = ({ username = "User" }) => {
       case "text-adventure":
         openWindow("text-adventure");
         break;
-      case "sample-app":
-        openWindow("sample-app", { name: username });
-        break;
       case "settings":
         // Open the settings window using our helper
         openSettings(windowContext);

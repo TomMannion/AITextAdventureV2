@@ -1,12 +1,18 @@
-// src/contexts/ThemeContext.jsx - with reset functionality
-import React, { createContext, useContext, useState, useEffect } from "react";
+// src/contexts/ThemeContext.jsx
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 
 // Base Windows 95 theme - this is the default we'll return to
 const baseTheme = {
   name: "win95",
   desktop: "#008080", // Classic teal Windows 95 background
   window: "#c0c0c0",
-  windowHeader: "#000080",
+  windowHeader: "#000080", // Windows 95 blue header
   text: "#000000",
   textLight: "#ffffff",
   borderLight: "#ffffff",
@@ -129,10 +135,21 @@ export const ThemeProvider = ({ children }) => {
     return theme;
   };
 
-  // Apply the theme to CSS variables
-  useEffect(() => {
+  // Force a reapplication of the theme (for fixing issues)
+  const forceThemeReapplication = useCallback(() => {
     const theme = getActiveTheme();
+    applyThemeToDOM(theme);
+    console.log("Theme forcibly reapplied:", theme.name);
+  }, [getActiveTheme]);
+
+  // Apply the theme to CSS variables
+  const applyThemeToDOM = (theme) => {
     const root = document.documentElement;
+
+    // Log for debugging
+    console.log("Applying theme:", theme.name);
+    console.log("Desktop color:", theme.desktop);
+    console.log("Window header color:", theme.windowHeader);
 
     // Set CSS variables
     root.style.setProperty("--win95-bg", theme.desktop);
@@ -155,6 +172,12 @@ export const ThemeProvider = ({ children }) => {
       root.classList.remove("crt-effect-disabled");
       root.style.setProperty("--crt-effect-level", theme.crtEffectLevel);
     }
+  };
+
+  // Apply the theme to CSS variables
+  useEffect(() => {
+    const theme = getActiveTheme();
+    applyThemeToDOM(theme);
 
     // Save preferences to localStorage
     localStorage.setItem("win95_theme", currentTheme);
@@ -166,53 +189,91 @@ export const ThemeProvider = ({ children }) => {
     localStorage.setItem("win95_crt_effect_level", crtEffectLevel.toString());
   }, [currentTheme, currentGenre, crtEffectLevel]);
 
+  // Initial application of theme after component mount
+  useEffect(() => {
+    // Force theme application on first render
+    const theme = getActiveTheme();
+    setTimeout(() => {
+      applyThemeToDOM(theme);
+      console.log("Initial theme applied");
+    }, 100);
+  }, []); // Empty dependency array for initial run only
+
   // Change theme based on game genre
-  const applyGenreTheme = (genre) => {
-    if (genreThemes[genre]) {
-      // Store current genre before changing (for restoration)
-      setPreviousGenre(currentGenre);
-      setCurrentGenre(genre);
-      // Mark text adventure as open when a genre theme is applied
-      setTextAdventureOpen(true);
-    } else {
-      // Default to base theme if genre not found
-      setCurrentGenre(null);
-    }
-  };
+  const applyGenreTheme = useCallback(
+    (genre) => {
+      if (genreThemes[genre]) {
+        // Store current genre before changing (for restoration)
+        setPreviousGenre(currentGenre);
+        setCurrentGenre(genre);
+        // Mark text adventure as open when a genre theme is applied
+        setTextAdventureOpen(true);
+
+        console.log(`Applying genre theme: ${genre}`);
+      } else {
+        // Default to base theme if genre not found
+        setCurrentGenre(null);
+        console.log("Genre not found, using default theme");
+      }
+    },
+    [currentGenre]
+  );
 
   // Restore previous theme when text adventure closes
-  const restoreDefaultTheme = () => {
+  const restoreDefaultTheme = useCallback(() => {
     // Only reset if text adventure was open
     if (textAdventureOpen) {
       setCurrentGenre(null);
       setTextAdventureOpen(false);
       console.log("Theme restored to default Windows 95");
+
+      // Force a reapplication after a short delay
+      setTimeout(() => {
+        const theme = getActiveTheme();
+        applyThemeToDOM(theme);
+        console.log("Default theme forcibly reapplied");
+      }, 50);
     }
-  };
+  }, [textAdventureOpen]);
 
   // Change to a specific theme (like highContrast)
-  const applySpecificTheme = (themeName) => {
+  const applySpecificTheme = useCallback((themeName) => {
     setCurrentTheme(themeName);
-  };
+    console.log(`Applying specific theme: ${themeName}`);
+
+    // Force a reapplication after a short delay
+    setTimeout(() => {
+      const theme = getActiveTheme();
+      applyThemeToDOM(theme);
+      console.log("Specific theme forcibly reapplied");
+    }, 50);
+  }, []);
 
   // Update CRT effect level
-  const updateCrtEffectLevel = (level) => {
+  const updateCrtEffectLevel = useCallback((level) => {
     // Ensure level is between 0 and 1
     const normalizedLevel = Math.max(0, Math.min(1, level));
     setCrtEffectLevel(normalizedLevel);
-  };
+  }, []);
 
   // Toggle CRT effect on/off
-  const toggleCrtEffect = () => {
+  const toggleCrtEffect = useCallback(() => {
     setCrtEffectLevel((prevLevel) => (prevLevel > 0 ? 0 : 0.5));
-  };
+  }, []);
 
   // Reset to default theme
-  const resetTheme = () => {
+  const resetTheme = useCallback(() => {
     setCurrentTheme("win95");
     setCurrentGenre(null);
     setCrtEffectLevel(0.5);
-  };
+
+    // Force application of default theme
+    setTimeout(() => {
+      const theme = getActiveTheme();
+      applyThemeToDOM(theme);
+      console.log("Theme reset to default");
+    }, 50);
+  }, []);
 
   // Context value
   const value = {
@@ -223,6 +284,7 @@ export const ThemeProvider = ({ children }) => {
     updateCrtEffectLevel,
     toggleCrtEffect,
     resetTheme,
+    forceThemeReapplication,
     currentTheme,
     currentGenre,
     crtEffectLevel,
