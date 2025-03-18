@@ -1,6 +1,7 @@
 import React from "react";
 import styled from "styled-components";
 import Text from "../common/Text";
+import { placeholderIcons } from "../../utils/iconUtils";
 
 const HeaderContainer = styled.div`
   display: flex;
@@ -14,10 +15,18 @@ const HeaderContainer = styled.div`
 `;
 
 const TitleContainer = styled.div`
+  display: flex;
+  align-items: center;
   flex-grow: 1;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+`;
+
+const WindowIcon = styled.img`
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
 `;
 
 /**
@@ -25,6 +34,7 @@ const TitleContainer = styled.div`
  *
  * @param {Object} props - Component props
  * @param {string} props.title - Window title
+ * @param {string} props.icon - Window icon URL
  * @param {boolean} props.isActive - Whether the window is currently active
  * @param {boolean} props.isMaximized - Whether the window is maximized
  * @param {Function} props.onMouseDown - Handler for mouse down events (for window dragging)
@@ -33,6 +43,7 @@ const TitleContainer = styled.div`
  */
 const WindowHeader = ({
   title,
+  icon,
   isActive = true,
   isMaximized = false,
   onMouseDown,
@@ -40,6 +51,9 @@ const WindowHeader = ({
   children,
   ...restProps
 }) => {
+  // Resolve the icon URL
+  const iconUrl = icon || placeholderIcons.windows;
+
   return (
     <HeaderContainer
       $isActive={isActive}
@@ -49,6 +63,7 @@ const WindowHeader = ({
       {...restProps}
     >
       <TitleContainer>
+        <WindowIcon src={iconUrl} alt="" />
         <Text color="white" size="12px" bold nowrap ellipsis>
           {title}
         </Text>

@@ -5,6 +5,7 @@ import Button from "../../../components/common/Button";
 import Text from "../../../components/common/Text";
 import { useAuth } from "../../../contexts/AuthContext";
 import { win95Border } from "../../../utils/styleUtils";
+import { placeholderIcons } from "../../../utils/iconUtils";
 
 // Styled components
 const ProfileContainer = styled.div`
@@ -33,8 +34,18 @@ const ProfileAvatar = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 32px;
   margin-bottom: 10px;
+  position: relative;
+`;
+
+const AvatarImage = styled.img`
+  width: 32px;
+  height: 32px;
+`;
+
+const AvatarInitials = styled.span`
+  font-size: 32px;
+  font-weight: bold;
 `;
 
 const ProfileTabs = styled.div`
@@ -48,10 +59,18 @@ const Tab = styled.div`
   cursor: pointer;
   ${(props) => (props.$active ? win95Border("inset") : "")}
   background-color: ${(props) => (props.$active ? "#f0f0f0" : "transparent")};
+  display: flex;
+  align-items: center;
 
   &:hover {
     background-color: ${(props) => (props.$active ? "#f0f0f0" : "#e0e0e0")};
   }
+`;
+
+const TabIcon = styled.img`
+  width: 16px;
+  height: 16px;
+  margin-right: 5px;
 `;
 
 const TabContent = styled.div`
@@ -193,13 +212,15 @@ const UserProfile = ({ onClose }) => {
         .substring(0, 2);
     }
 
-    return currentUser.username.charAt(0).toUpperCase();
+    return currentUser.username?.charAt(0).toUpperCase() || "?";
   };
 
   return (
     <ProfileContainer>
       <ProfileHeader>
-        <ProfileAvatar>{getInitials()}</ProfileAvatar>
+        <ProfileAvatar>
+          <AvatarInitials>{getInitials()}</AvatarInitials>
+        </ProfileAvatar>
         <Text size="18px" bold>
           {currentUser?.displayName || currentUser?.username || "User"}
         </Text>
@@ -210,12 +231,14 @@ const UserProfile = ({ onClose }) => {
           $active={activeTab === "profile"}
           onClick={() => setActiveTab("profile")}
         >
+          <TabIcon src={placeholderIcons.user} alt="Profile" />
           Profile
         </Tab>
         <Tab
           $active={activeTab === "settings"}
           onClick={() => setActiveTab("settings")}
         >
+          <TabIcon src={placeholderIcons.settings} alt="Settings" />
           Settings
         </Tab>
       </ProfileTabs>
@@ -267,6 +290,11 @@ const UserProfile = ({ onClose }) => {
 
             <ButtonContainer>
               <Button type="submit" primary disabled={isSubmitting}>
+                <img
+                  src={placeholderIcons.save}
+                  alt=""
+                  style={{ width: "16px", height: "16px", marginRight: "5px" }}
+                />
                 {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
             </ButtonContainer>
@@ -281,6 +309,11 @@ const UserProfile = ({ onClose }) => {
 
             <ButtonContainer>
               <Button onClick={handleLogout} disabled={isSubmitting}>
+                <img
+                  src={placeholderIcons.shutdown}
+                  alt=""
+                  style={{ width: "16px", height: "16px", marginRight: "5px" }}
+                />
                 {isSubmitting ? "Logging out..." : "Log Out"}
               </Button>
             </ButtonContainer>

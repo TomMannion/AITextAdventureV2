@@ -2,6 +2,9 @@
 import React from "react";
 import styled from "styled-components";
 import useGameState from "../hooks/useGameState";
+import { placeholderIcons } from "../../../utils/iconUtils";
+import Button from "../../../components/common/Button";
+import Text from "../../../components/common/Text";
 
 // Styled components
 const LauncherContainer = styled.div`
@@ -20,6 +23,15 @@ const Title = styled.h2`
   text-align: center;
   border-bottom: 2px solid var(--win95-border-dark);
   padding-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const TitleIcon = styled.img`
+  width: 24px;
+  height: 24px;
+  margin-right: 10px;
 `;
 
 const ButtonContainer = styled.div`
@@ -50,9 +62,10 @@ const ActionButton = styled.button`
   }
 `;
 
-const Icon = styled.span`
+const Icon = styled.img`
+  width: 24px;
+  height: 24px;
   margin-right: 10px;
-  font-size: 16px;
 `;
 
 const GameLauncher = () => {
@@ -76,15 +89,20 @@ const GameLauncher = () => {
 
   return (
     <LauncherContainer>
-      <Title>Text Adventure Game Launcher</Title>
+      <Title>
+        <TitleIcon src={placeholderIcons.adventure} alt="Adventure" />
+        Text Adventure Game Launcher
+      </Title>
 
       <ButtonContainer>
         <ActionButton onClick={handleNewGame}>
-          <Icon>🧙</Icon> Start New Adventure
+          <Icon src={placeholderIcons.adventure} alt="New Adventure" />
+          Start New Adventure
         </ActionButton>
 
         <ActionButton onClick={handleLoadGames}>
-          <Icon>📂</Icon> Continue Saved Adventure
+          <Icon src={placeholderIcons.folder} alt="Saved Adventures" />
+          Continue Saved Adventure
         </ActionButton>
       </ButtonContainer>
     </LauncherContainer>

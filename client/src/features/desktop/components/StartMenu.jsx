@@ -4,6 +4,7 @@ import styled from "styled-components";
 import Text from "../../../components/common/Text";
 import { win95Border } from "../../../utils/styleUtils";
 import { useAuth } from "../../../contexts/AuthContext";
+import { placeholderIcons, getMenuItemIcon } from "../../../utils/iconUtils";
 
 const MenuContainer = styled.div`
   position: absolute;
@@ -110,54 +111,69 @@ const StartMenu = ({ isOpen, username = "User", onMenuItemClick }) => {
     {
       id: "user",
       label: username,
-      icon: "/icons/user.ico",
+      icon: placeholderIcons.user,
       isStatic: true,
     },
     { id: "divider-1", isDivider: true },
     {
       id: "programs",
       label: "Programs",
-      icon: "/icons/programs.ico",
+      icon: placeholderIcons.folder,
       hasSubmenu: true,
       submenuItems: [
         {
           id: "text-adventure",
           label: "Text Adventure",
-          icon: "/icons/adventure.ico",
+          icon: placeholderIcons.adventure,
         },
         {
-          id: "story-editor",
-          label: "Story Editor",
-          icon: "/icons/editor.ico",
+          id: "notepad",
+          label: "Notepad",
+          icon: placeholderIcons.notepad,
+        },
+        {
+          id: "calculator",
+          label: "Calculator",
+          icon: placeholderIcons.calculator,
+        },
+        {
+          id: "paint",
+          label: "Paint",
+          icon: placeholderIcons.paint,
+        },
+        {
+          id: "minesweeper",
+          label: "Minesweeper",
+          icon: placeholderIcons.minesweeper,
         },
       ],
     },
     {
       id: "documents",
       label: "Documents",
-      icon: "/icons/documents.ico",
+      icon: placeholderIcons.myDocuments,
       hasSubmenu: true,
       submenuItems: [
         {
           id: "my-documents",
           label: "My Adventures",
-          icon: "/icons/documents.ico",
+          icon: placeholderIcons.folderClosed,
         },
         {
           id: "completed-stories",
           label: "Completed Stories",
-          icon: "/icons/documents.ico",
+          icon: placeholderIcons.document,
         },
       ],
     },
-    { id: "settings", label: "Settings", icon: "/icons/settings.ico" },
-    { id: "find", label: "Find", icon: "/icons/find.ico" },
-    { id: "help", label: "Help", icon: "/icons/help.ico" },
-    { id: "run", label: "Run...", icon: "/icons/run.ico" },
+    { id: "settings", label: "Settings", icon: placeholderIcons.settings },
+    { id: "find", label: "Find", icon: placeholderIcons.search },
+    { id: "help", label: "Help", icon: placeholderIcons.help },
+    { id: "run", label: "Run...", icon: placeholderIcons.explorer },
     { id: "divider-2", isDivider: true },
-    { id: "user-profile", label: "User Profile", icon: "/icons/user.ico" },
+    { id: "user-profile", label: "User Profile", icon: placeholderIcons.user },
     { id: "divider-3", isDivider: true },
-    { id: "shutdown", label: "Shut Down...", icon: "/icons/shutdown.ico" },
+    { id: "shutdown", label: "Shut Down...", icon: placeholderIcons.shutdown },
   ];
 
   // Find menu item by ID

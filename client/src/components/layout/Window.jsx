@@ -3,6 +3,7 @@ import styled from "styled-components";
 import WindowHeader from "./WindowHeader";
 import WindowContent from "./WindowContent";
 import WindowControls from "./WindowControls";
+import { placeholderIcons } from "../../utils/iconUtils";
 
 // Styled components
 const WindowContainer = styled.div`
@@ -58,6 +59,7 @@ const ResizeHandle = styled.div`
 const Window = ({
   id,
   title,
+  icon,
   children,
   width = 400,
   height = 300,
@@ -97,6 +99,50 @@ const Window = ({
     startWidth: 0,
     startHeight: 0,
   });
+
+  // Resolve the window icon
+  const resolveWindowIcon = () => {
+    if (!icon) {
+      // Default icon based on window title
+      if (title) {
+        const titleLower = title.toLowerCase();
+        if (titleLower.includes("adventure") || titleLower.includes("game")) {
+          return placeholderIcons.adventure;
+        }
+        if (titleLower.includes("settings")) {
+          return placeholderIcons.settings;
+        }
+        if (titleLower.includes("profile") || titleLower.includes("user")) {
+          return placeholderIcons.user;
+        }
+        if (titleLower.includes("document") || titleLower.includes("folder")) {
+          return placeholderIcons.folder;
+        }
+      }
+
+      // Default fallback
+      return placeholderIcons.windows;
+    }
+
+    // If icon is an emoji, map to placeholder
+    if (
+      typeof icon === "string" &&
+      !icon.startsWith("/") &&
+      !icon.startsWith("http")
+    ) {
+      if (icon === "🧙") return placeholderIcons.adventure;
+      if (icon === "⚙️" || icon === "🔧") return placeholderIcons.settings;
+      if (icon === "👤") return placeholderIcons.user;
+      if (icon === "📁") return placeholderIcons.folder;
+
+      // Default for other emojis
+      return placeholderIcons.windows;
+    }
+
+    return icon;
+  };
+
+  const windowIcon = resolveWindowIcon();
 
   // Update position and size when props change
   useEffect(() => {
@@ -268,6 +314,7 @@ const Window = ({
     >
       <WindowHeader
         title={title}
+        icon={windowIcon}
         isActive={isActive}
         isMaximized={isMaximized}
         onMouseDown={handleHeaderMouseDown}

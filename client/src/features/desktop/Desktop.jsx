@@ -1,4 +1,4 @@
-// src/features/desktop/Desktop.jsx - Updated to support settings window
+// src/features/desktop/Desktop.jsx
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import DesktopBackground from "./components/DesktopBackground";
@@ -7,7 +7,8 @@ import Taskbar from "./components/Taskbar";
 import StartMenu from "./components/StartMenu";
 import WindowSystem, { useWindowSystem } from "../window-system/WindowSystem";
 import registerApplicationWindows from "./registerWindows";
-import { openSettings } from "../settings/SettingsModule"; // Import the settings helper
+import { openSettings } from "../settings/SettingsModule";
+import { placeholderIcons } from "../../utils/iconUtils";
 
 const DesktopContainer = styled.div`
   width: 100vw;
@@ -24,7 +25,7 @@ const DesktopContent = ({ username = "User" }) => {
   // State for start menu
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
 
-  // Get window system functions - this works now because we're inside the provider
+  // Get window system functions
   const windowContext = useWindowSystem();
   const { openWindow } = windowContext;
 
@@ -55,17 +56,34 @@ const DesktopContent = ({ username = "User" }) => {
     // Open the associated application
     switch (iconId) {
       case "text-adventure":
-        openWindow("text-adventure");
+        openWindow("text-adventure", {
+          icon: placeholderIcons.adventure,
+        });
         break;
       case "settings":
         // Open the settings window using our helper
         openSettings(windowContext);
         break;
       case "my-documents":
-        // Will be implemented later
+        openWindow("my-documents", {
+          icon: placeholderIcons.myDocuments,
+        });
         break;
       case "recycle-bin":
-        // Will be implemented later
+        // For now just show a notification about not being implemented
+        const { showInfo } = windowContext;
+        if (showInfo) {
+          showInfo("The Recycle Bin feature is not yet implemented.", {
+            title: "Recycle Bin",
+            icon: placeholderIcons.recycle,
+            timeout: 3000,
+          });
+        }
+        break;
+      case "user-profile":
+        openWindow("user-profile", {
+          icon: placeholderIcons.user,
+        });
         break;
       default:
         console.log(`Unknown icon: ${iconId}`);
@@ -83,14 +101,37 @@ const DesktopContent = ({ username = "User" }) => {
     // Open the associated application
     switch (itemId) {
       case "text-adventure":
-        openWindow("text-adventure");
+        openWindow("text-adventure", {
+          icon: placeholderIcons.adventure,
+        });
         break;
       case "settings":
         // Open the settings window using our helper
         openSettings(windowContext);
         break;
+      case "user-profile":
+        openWindow("user-profile", {
+          icon: placeholderIcons.user,
+        });
+        break;
+      case "my-documents":
+        openWindow("my-documents", {
+          icon: placeholderIcons.myDocuments,
+        });
+        break;
+      case "notepad":
+        // For now just show a notification about not being implemented
+        const { showInfo } = windowContext;
+        if (showInfo) {
+          showInfo("Notepad is not yet implemented.", {
+            title: "Notepad",
+            icon: placeholderIcons.notepad,
+            timeout: 3000,
+          });
+        }
+        break;
       case "shutdown":
-        // Will be implemented later
+        // Will be implemented by the auth context in the StartMenu component
         break;
       default:
         console.log(`Unknown menu item: ${itemId}`);

@@ -178,18 +178,65 @@ const Taskbar = ({ isStartMenuOpen, toggleStartMenu }) => {
 
   // Get icon for window
   const getWindowIcon = (window) => {
-    if (!window || !window.icon) {
-      return placeholderIcons.windows;
-    }
+    if (!window) return placeholderIcons.windows;
 
-    // Handle different icon formats
-    if (typeof window.icon === "string") {
-      if (window.icon.startsWith("http") || window.icon.startsWith("/")) {
-        return window.icon;
+    // If icon is provided as a direct URL
+    if (window.icon && typeof window.icon === "string") {
+      // Handle emojis or other non-path strings
+      if (!window.icon.startsWith("/") && !window.icon.startsWith("http")) {
+        // Try to map common emoji references to actual icons
+        if (window.icon === "🧙") return placeholderIcons.adventure;
+        if (window.icon === "📖") return placeholderIcons.document;
+        if (window.icon === "⚙️" || window.icon === "🔧")
+          return placeholderIcons.settings;
+
+        // Default for other emojis
+        return placeholderIcons.document;
       }
 
-      // If it's an emoji or other string, use default
-      return placeholderIcons.windows;
+      return window.icon;
+    }
+
+    // Look up icon by window component type or title
+    if (window.component) {
+      const componentName =
+        window.component.name || window.component.displayName || "";
+
+      if (
+        componentName.includes("Game") ||
+        componentName.includes("Adventure")
+      ) {
+        return placeholderIcons.adventure;
+      }
+
+      if (componentName.includes("Settings")) {
+        return placeholderIcons.settings;
+      }
+
+      if (componentName.includes("Profile") || componentName.includes("User")) {
+        return placeholderIcons.user;
+      }
+    }
+
+    // Try to identify by title
+    if (window.title) {
+      const title = window.title.toLowerCase();
+
+      if (title.includes("adventure") || title.includes("game")) {
+        return placeholderIcons.adventure;
+      }
+
+      if (title.includes("settings") || title.includes("preferences")) {
+        return placeholderIcons.settings;
+      }
+
+      if (title.includes("profile") || title.includes("user")) {
+        return placeholderIcons.user;
+      }
+
+      if (title.includes("document") || title.includes("notepad")) {
+        return placeholderIcons.notepad;
+      }
     }
 
     return placeholderIcons.windows;

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import DesktopIcon from "./DesktopIcon";
 import useDesktopIcons from "../hooks/useDesktopIcons";
+import { placeholderIcons } from "../../../utils/iconUtils";
 
 const IconsContainer = styled.div`
   position: absolute;
@@ -55,6 +56,41 @@ const DesktopIcons = ({ onIconOpen }) => {
     iconStartX: 0,
     iconStartY: 0,
   });
+
+  // Get icon URL from icon path, fallback to placeholder icons when needed
+  const getIconUrl = (iconPath) => {
+    // If the iconPath is already a URL or path, return it
+    if (
+      typeof iconPath === "string" &&
+      (iconPath.startsWith("/") || iconPath.startsWith("http"))
+    ) {
+      return iconPath;
+    }
+
+    // For emoji icons, map to appropriate placeholder icons
+    if (typeof iconPath === "string") {
+      if (iconPath === "🧙") return placeholderIcons.adventure;
+      if (iconPath === "⚙️" || iconPath === "🔧")
+        return placeholderIcons.settings;
+      if (iconPath === "📁") return placeholderIcons.folder;
+      if (iconPath === "📄") return placeholderIcons.document;
+      if (iconPath === "🗑️") return placeholderIcons.recycle;
+    }
+
+    // Default icons by ID
+    switch (iconPath) {
+      case "text-adventure":
+        return placeholderIcons.adventure;
+      case "settings":
+        return placeholderIcons.settings;
+      case "my-documents":
+        return placeholderIcons.myDocuments;
+      case "recycle-bin":
+        return placeholderIcons.recycle;
+      default:
+        return placeholderIcons.document;
+    }
+  };
 
   // Handle background click to clear selection
   const handleBackgroundClick = (e) => {
@@ -205,7 +241,7 @@ const DesktopIcons = ({ onIconOpen }) => {
           <DesktopIcon
             id={icon.id}
             name={icon.name}
-            icon={icon.icon}
+            icon={getIconUrl(icon.icon)}
             isSelected={selectedIconId === icon.id}
             onClick={handleIconClick}
             onDoubleClick={handleIconDoubleClick}

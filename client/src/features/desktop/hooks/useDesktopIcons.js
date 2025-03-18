@@ -1,29 +1,30 @@
 import { useState, useEffect } from "react";
+import { placeholderIcons } from "../../../utils/iconUtils";
 
 // Default icons that will always be available on the desktop
 const DEFAULT_ICONS = [
   {
     id: "text-adventure",
     name: "Text Adventure",
-    icon: "/icons/TextAdventure.ico", // Use your actual icon path
+    icon: placeholderIcons.adventure,
     position: { x: 20, y: 20 },
   },
   {
     id: "my-documents",
     name: "My Documents",
-    icon: "/icons/DocumentsFolder.ico",
+    icon: placeholderIcons.folder,
     position: { x: 20, y: 120 },
   },
   {
     id: "settings",
     name: "Settings",
-    icon: "/icons/Settings.ico",
+    icon: placeholderIcons.settings,
     position: { x: 20, y: 220 },
   },
   {
     id: "recycle-bin",
     name: "Recycle Bin",
-    icon: "/icons/RecycleBinWithDocument.ico",
+    icon: placeholderIcons.recycle,
     position: { x: 20, y: 320 },
   },
 ];

@@ -6,6 +6,7 @@ import { useSettings } from "../../../contexts/SettingsContext";
 import Button from "../../../components/common/Button";
 import Text from "../../../components/common/Text";
 import { win95Border } from "../../../utils/styleUtils";
+import { placeholderIcons, getGenreIcon } from "../../../utils/iconUtils";
 
 // Styled components
 const CreatorContainer = styled.div`
@@ -89,6 +90,14 @@ const GenrePreview = styled.div`
 const GenreTitle = styled.h3`
   margin-bottom: 10px;
   color: var(--win95-window-header);
+  display: flex;
+  align-items: center;
+`;
+
+const GenreIcon = styled.img`
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
 `;
 
 const GenreDescription = styled.p`
@@ -332,6 +341,9 @@ const GameCreator = () => {
     }
   };
 
+  // Get the current genre from settings
+  const currentGenre = genreInfo[newGameSettings.genre] || genreInfo.fantasy;
+
   if (isSubmitting) {
     return (
       <CreatorContainer>
@@ -387,7 +399,13 @@ const GameCreator = () => {
           </FormGroup>
 
           <GenrePreview $bgColor={currentGenre.bgColor}>
-            <GenreTitle>{currentGenre.name}</GenreTitle>
+            <GenreTitle>
+              <GenreIcon
+                src={getGenreIcon(newGameSettings.genre)}
+                alt={currentGenre.name}
+              />
+              {currentGenre.name}
+            </GenreTitle>
             <GenreDescription>{currentGenre.description}</GenreDescription>
             <Example>
               <em>Example:</em> "{currentGenre.example}"
@@ -460,8 +478,20 @@ const GameCreator = () => {
       )}
 
       <ButtonContainer>
-        <Button onClick={returnToLauncher}>Cancel</Button>
+        <Button onClick={returnToLauncher}>
+          <img
+            src={placeholderIcons.windows}
+            alt=""
+            style={{ width: "16px", height: "16px", marginRight: "4px" }}
+          />
+          Cancel
+        </Button>
         <Button primary onClick={handleSubmit}>
+          <img
+            src={placeholderIcons.adventure}
+            alt=""
+            style={{ width: "16px", height: "16px", marginRight: "4px" }}
+          />
           Create Adventure
         </Button>
       </ButtonContainer>
