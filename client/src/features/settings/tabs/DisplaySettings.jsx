@@ -119,6 +119,41 @@ const Slider = styled.input`
   }
 `;
 
+const NotificationPreview = styled.div`
+  ${win95Border("outset")}
+  margin-top: 20px;
+  background-color: #c0c0c0;
+  width: 100%;
+  max-width: 300px;
+`;
+
+const PreviewHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #000080;
+  color: white;
+  padding: 3px 5px;
+  font-weight: bold;
+  font-size: 12px;
+`;
+
+const PreviewIcon = styled.img`
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+`;
+
+const PreviewHeaderContent = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+const PreviewContent = styled.div`
+  padding: 8px;
+  font-size: 12px;
+`;
+
 const ThemePreviewGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -183,7 +218,8 @@ const PreviewWindow = styled.div`
   overflow: hidden;
 `;
 
-const PreviewHeader = styled.div`
+// Renamed from PreviewHeader to ThemePreviewHeader to avoid duplication
+const ThemePreviewHeader = styled.div`
   background-color: var(--win95-window-header);
   color: white;
   padding: 3px 5px;
@@ -192,7 +228,7 @@ const PreviewHeader = styled.div`
   align-items: center;
 `;
 
-const PreviewContent = styled.div`
+const ThemePreviewContent = styled.div`
   padding: 10px;
   position: relative;
   height: calc(100% - 24px);
@@ -327,11 +363,9 @@ const DisplaySettings = () => {
   const applyTheme = useCallback((themeValue) => {
     console.log(`Applying theme: ${themeValue}`);
 
-    // Handle specific themes
+    // Handle specific themes - removed highContrast from here
     if (themeValue === "win95") {
       applySpecificTheme("win95");
-    } else if (themeValue === "highContrast") {
-      applySpecificTheme("highContrast");
     }
     // Handle genre themes
     else if (genreThemes.includes(themeValue)) {
@@ -405,16 +439,14 @@ const DisplaySettings = () => {
       mystery: "#2f2c3d", // Dark purple/blue
       western: "#8b5a2b", // Sandy brown
       win95: "#008080", // Windows 95 teal
-      highContrast: "#000000" // Black for high contrast
     };
 
     return colors[genre] || "#c0c0c0";
   }, []);
 
-  // Available themes with name and color
+  // Available themes with name and color - removed highContrast
   const availableThemes = [
     { value: "win95", label: "Windows 95", color: getGenreColor("win95") },
-    { value: "highContrast", label: "High Contrast", color: getGenreColor("highContrast") },
     ...genreThemes.map(genre => ({
       value: genre,
       label: genre.charAt(0).toUpperCase() + genre.slice(1),
@@ -460,7 +492,7 @@ const DisplaySettings = () => {
               <Text
                 size="10px"
                 color={
-                  ["highContrast", "horror", "scifi"].includes(theme.value)
+                  ["horror", "scifi"].includes(theme.value)
                     ? "white"
                     : "black"
                 }
@@ -471,6 +503,11 @@ const DisplaySettings = () => {
             </ThemePreviewItem>
           ))}
         </ThemePreviewGrid>
+
+        {/* Added note about High Contrast mode */}
+        <Text size="11px" color="#666" margin="10px 0 0 0">
+          Note: High Contrast Mode has been moved to the Accessibility tab
+        </Text>
       </SettingsSection>
 
       <SettingsSection>
@@ -528,15 +565,17 @@ const DisplaySettings = () => {
           <PreviewTitle>Current Theme Preview</PreviewTitle>
           
           <PreviewWindow>
-            <PreviewHeader>
+            {/* Using ThemePreviewHeader instead of PreviewHeader here */}
+            <ThemePreviewHeader>
               <img 
                 src={placeholderIcons.windows} 
                 alt="Window" 
                 style={{ width: "16px", height: "16px", marginRight: "5px" }} 
               />
               Sample Window
-            </PreviewHeader>
-            <PreviewContent>
+            </ThemePreviewHeader>
+            {/* Using ThemePreviewContent instead of PreviewContent here */}
+            <ThemePreviewContent>
               <Text>This is how your windows will appear with the selected theme.</Text>
               <Text>Try adjusting the CRT effect to see how it changes the appearance.</Text>
               
@@ -544,7 +583,7 @@ const DisplaySettings = () => {
               {!settings.accessibility.disableCrtEffect && (
                 <CRTOverlay $intensity={isPreviewActive ? localSettings.crtEffectLevel : crtEffectLevel} />
               )}
-            </PreviewContent>
+            </ThemePreviewContent>
           </PreviewWindow>
           
           <Text size="11px" color="#666">

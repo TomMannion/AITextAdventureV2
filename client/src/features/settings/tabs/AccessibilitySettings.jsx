@@ -4,6 +4,7 @@ import styled from "styled-components";
 import { win95Border } from "../../../utils/styleUtils";
 import Text from "../../../components/common/Text";
 import { useSettings } from "../../../contexts/SettingsContext";
+import { useThemeContext } from "../../../contexts/ThemeContext"; // Added import
 
 // Styled components
 const SettingsSection = styled.div`
@@ -51,12 +52,23 @@ const PreviewArea = styled.div`
   font-size: ${(props) => (props.$largeText ? "16px" : "12px")};
 `;
 
+// Added component for theme preview
+const ThemePreview = styled.div`
+  ${win95Border("outset")}
+  padding: 15px;
+  margin-top: 15px;
+  background-color: ${props => props.$bgColor || "black"};
+  color: ${props => props.$textColor || "white"};
+`;
+
 /**
  * Accessibility Settings Component
  */
 const AccessibilitySettings = () => {
   const { settings, updateSettings } = useSettings();
+  const { applySpecificTheme } = useThemeContext(); // Added useThemeContext
   const [localSettings, setLocalSettings] = useState(settings.accessibility);
+  const [previewHighContrast, setPreviewHighContrast] = useState(false);
 
   // Update local state when settings change
   useEffect(() => {
@@ -74,6 +86,18 @@ const AccessibilitySettings = () => {
           [name]: checked,
         };
 
+        // If changing high contrast, preview it immediately
+        if (name === "highContrast") {
+          setPreviewHighContrast(checked);
+          
+          // Apply high contrast theme immediately for preview
+          if (checked) {
+            applySpecificTheme("highContrast");
+          } else {
+            applySpecificTheme("win95");
+          }
+        }
+
         // Update context directly here, after a short timeout to prevent circular updates
         setTimeout(() => {
           updateSettings("accessibility", newSettings);
@@ -82,7 +106,7 @@ const AccessibilitySettings = () => {
         return newSettings;
       });
     },
-    [updateSettings]
+    [updateSettings, applySpecificTheme]
   );
 
   return (
@@ -105,9 +129,30 @@ const AccessibilitySettings = () => {
             High Contrast Mode
           </CheckboxLabel>
           <HelperText>
-            Increases contrast for better readability and color distinction
+            Use high contrast colors for better visibility and readability
           </HelperText>
         </OptionContainer>
+
+        {/* Added high contrast theme preview */}
+        <ThemePreview 
+          $bgColor={previewHighContrast ? "black" : "#f0f0f0"} 
+          $textColor={previewHighContrast ? "white" : "black"}
+        >
+          <Text 
+            size="14px" 
+            bold 
+            color={previewHighContrast ? "white" : "black"}
+          >
+            High Contrast Preview
+          </Text>
+          <Text 
+            size="12px" 
+            margin="10px 0 0 0" 
+            color={previewHighContrast ? "white" : "black"}
+          >
+            This is how text and UI elements will appear with high contrast {previewHighContrast ? "enabled" : "disabled"}.
+          </Text>
+        </ThemePreview>
 
         <OptionContainer>
           <CheckboxLabel>
