@@ -1,4 +1,3 @@
-// src/features/settings/tabs/AccessibilitySettings.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import { win95Border } from "../../../utils/styleUtils";
@@ -52,7 +51,7 @@ const PreviewArea = styled.div`
   font-size: ${(props) => (props.$largeText ? "16px" : "12px")};
 `;
 
-// Added component for theme preview
+// Theme preview
 const ThemePreview = styled.div`
   ${win95Border("outset")}
   padding: 15px;
@@ -61,79 +60,87 @@ const ThemePreview = styled.div`
   color: ${props => props.$textColor || "white"};
 `;
 
+const ActionButtons = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 15px;
+`;
+
 /**
  * Accessibility Settings Component
  */
 const AccessibilitySettings = () => {
   const { settings, updateSettings } = useSettings();
-  const { applySpecificTheme, updateCrtEffectLevel, crtEffectLevel } = useThemeContext();
+  const { applyTheme, updateCrtEffect } = useThemeContext();
+  
+  // Local settings
   const [localSettings, setLocalSettings] = useState(settings.accessibility);
+  
+  // Track unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // Preview state
   const [previewHighContrast, setPreviewHighContrast] = useState(false);
 
   // Update local state when settings change
   useEffect(() => {
-    setLocalSettings(settings.accessibility);
-  }, [settings.accessibility]);
+    if (!hasUnsavedChanges) {
+      setLocalSettings(settings.accessibility);
+    }
+  }, [settings.accessibility, hasUnsavedChanges]);
 
   // Handle checkbox change
-  const handleChange = useCallback(
-    (e) => {
-      const { name, checked } = e.target;
+  const handleChange = useCallback((e) => {
+    const { name, checked } = e.target;
 
-      setLocalSettings((prev) => {
-        const newSettings = {
-          ...prev,
-          [name]: checked,
-        };
-
-        // If changing high contrast, preview it immediately
-        if (name === "highContrast") {
-          setPreviewHighContrast(checked);
-          
-          // Apply high contrast theme immediately for preview
-          if (checked) {
-            applySpecificTheme("highContrast");
-          } else {
-            applySpecificTheme("win95");
-          }
-        }
-        
-        // If disabling CRT effect, immediately disable it
-        if (name === "disableCrtEffect") {
-          // If checked, disable CRT by setting effect level to 0
-          // If unchecked, restore a default level of 0.5
-          updateCrtEffectLevel(checked ? 0 : 0.5);
-          
-          // Also remove any existing CRT overlay immediately
-          if (checked) {
-            const existingStyle = document.getElementById("crt-effect-style");
-            if (existingStyle) {
-              existingStyle.remove();
-            }
-            
-            const crtOverlay = document.getElementById("crt-overlay");
-            if (crtOverlay) {
-              crtOverlay.remove();
-            }
-            
-            // Add the disabled class to the root
-            document.documentElement.classList.add("crt-effect-disabled");
-          } else {
-            // Remove the disabled class if re-enabling
-            document.documentElement.classList.remove("crt-effect-disabled");
-          }
-        }
-
-        // Update context directly here, after a short timeout to prevent circular updates
-        setTimeout(() => {
-          updateSettings("accessibility", newSettings);
-        }, 0);
-
-        return newSettings;
-      });
-    },
-    [updateSettings, applySpecificTheme, updateCrtEffectLevel]
-  );
+    setLocalSettings(prev => {
+      const newSettings = {
+        ...prev,
+        [name]: checked
+      };
+      
+      // Preview high contrast immediately
+      if (name === "highContrast") {
+        setPreviewHighContrast(checked);
+      }
+      
+      return newSettings;
+    });
+    
+    setHasUnsavedChanges(true);
+  }, []);
+  
+  // Apply changes
+  const handleApply = useCallback(() => {
+    // Update settings context
+    updateSettings("accessibility", localSettings);
+    
+    // Apply high contrast theme if enabled
+    if (localSettings.highContrast) {
+      applyTheme("highContrast");
+    } else if (settings.accessibility.highContrast) {
+      // Only switch back if it was previously enabled
+      applyTheme("win95");
+    }
+    
+    // Update CRT effect based on disableCrtEffect setting
+    if (localSettings.disableCrtEffect) {
+      updateCrtEffect({ enabled: false, intensity: 0 });
+    } else if (settings.accessibility.disableCrtEffect) {
+      // Only enable if it was previously disabled
+      updateCrtEffect({ enabled: true, intensity: 0.5 });
+    }
+    
+    setHasUnsavedChanges(false);
+  }, [localSettings, updateSettings, applyTheme, updateCrtEffect, settings.accessibility.highContrast, settings.accessibility.disableCrtEffect]);
+  
+  // Reset changes
+  const handleCancel = useCallback(() => {
+    setLocalSettings(settings.accessibility);
+    setPreviewHighContrast(settings.accessibility.highContrast);
+    setHasUnsavedChanges(false);
+  }, [settings.accessibility]);
 
   return (
     <div>
@@ -159,7 +166,7 @@ const AccessibilitySettings = () => {
           </HelperText>
         </OptionContainer>
 
-        {/* Added high contrast theme preview */}
+        {/* High contrast theme preview */}
         <ThemePreview 
           $bgColor={previewHighContrast ? "black" : "#f0f0f0"} 
           $textColor={previewHighContrast ? "white" : "black"}
@@ -317,6 +324,38 @@ const AccessibilitySettings = () => {
         <HelperText style={{ marginLeft: 0, marginTop: 10 }}>
           The preview reflects your current accessibility settings
         </HelperText>
+        
+        {hasUnsavedChanges && (
+          <ActionButtons>
+            <button 
+              onClick={handleApply}
+              style={{
+                backgroundColor: "#c0c0c0",
+                border: "2px solid #000",
+                borderTopColor: "#ffffff",
+                borderLeftColor: "#ffffff",
+                padding: "3px 10px",
+                fontWeight: "bold",
+                cursor: "pointer"
+              }}
+            >
+              Apply Changes
+            </button>
+            <button 
+              onClick={handleCancel}
+              style={{
+                backgroundColor: "#c0c0c0",
+                border: "2px solid #000",
+                borderTopColor: "#ffffff",
+                borderLeftColor: "#ffffff",
+                padding: "3px 10px",
+                cursor: "pointer"
+              }}
+            >
+              Cancel
+            </button>
+          </ActionButtons>
+        )}
       </SettingsSection>
     </div>
   );
