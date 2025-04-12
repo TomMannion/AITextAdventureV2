@@ -6,7 +6,6 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { useThemeContext } from "./ThemeContext";
 import { useNotification } from "./NotificationContext";
 import { useSettings } from "../contexts/SettingsContext";
 import { gameService } from "../services/api.service";
@@ -167,7 +166,6 @@ const GameContext = createContext(null);
  */
 export const GameProvider = ({ children }) => {
   const [state, dispatch] = useReducer(gameReducer, initialState);
-  const { applyGenreTheme } = useThemeContext();
   const { showInfo, showError } = useNotification();
   const fetchingGamesRef = useRef(false);
 
@@ -201,13 +199,9 @@ export const GameProvider = ({ children }) => {
   const setCurrentGame = useCallback(
     (game) => {
       dispatch({ type: ACTIONS.SET_CURRENT_GAME, payload: game });
-
-      // Apply theme based on game genre
-      if (game && game.genre) {
-        applyGenreTheme(game.genre);
-      }
+      // Theme application code removed
     },
-    [applyGenreTheme]
+    []
   );
 
   const setGameList = useCallback((games) => {
@@ -229,13 +223,9 @@ export const GameProvider = ({ children }) => {
   const updateNewGameSettings = useCallback(
     (settings) => {
       dispatch({ type: ACTIONS.SET_NEW_GAME_SETTINGS, payload: settings });
-
-      // If genre is changing, update theme
-      if (settings.genre) {
-        applyGenreTheme(settings.genre);
-      }
+      // Theme application code removed
     },
-    [applyGenreTheme]
+    []
   );
 
   const setCurrentSegment = useCallback((segment) => {
@@ -387,6 +377,8 @@ export const GameProvider = ({ children }) => {
 
   const createGame = useCallback(
     async (gameData) => {
+      let progressInterval;
+      
       try {
         if (!state.apiKey) {
           throw new Error("LLM API key is required for game creation");
@@ -399,7 +391,7 @@ export const GameProvider = ({ children }) => {
         clearError();
 
         // Simulate progressive loading for better UX
-        const progressInterval = setInterval(() => {
+        progressInterval = setInterval(() => {
           setLoadingProgress((prev) => {
             if (prev >= 90) {
               clearInterval(progressInterval);
@@ -421,8 +413,7 @@ export const GameProvider = ({ children }) => {
           setStatus("playing");
           resetGameState();
 
-          // Apply theme based on game genre
-          applyGenreTheme(newGame.genre);
+          // Apply theme code removed
 
           // Add initial log entry
           addLog({
@@ -444,7 +435,9 @@ export const GameProvider = ({ children }) => {
         setStatus("creating"); // Go back to creation form
         return null;
       } finally {
-        clearInterval(progressInterval);
+        if (progressInterval) {
+          clearInterval(progressInterval);
+        }
       }
     },
     [
@@ -455,7 +448,6 @@ export const GameProvider = ({ children }) => {
       setError,
       setCurrentGame,
       resetGameState,
-      applyGenreTheme,
       addLog,
       showInfo,
     ]
@@ -525,8 +517,7 @@ export const GameProvider = ({ children }) => {
           setOptions(options);
           setStatus("playing");
 
-          // Apply theme based on game genre
-          applyGenreTheme(game.genre);
+          // Theme application code removed
 
           // Add log entry
           addLog({
@@ -563,7 +554,6 @@ export const GameProvider = ({ children }) => {
       setSegments,
       setCurrentSegment,
       setOptions,
-      applyGenreTheme,
       addLog,
       showInfo,
     ]
@@ -714,6 +704,8 @@ export const GameProvider = ({ children }) => {
   // Function to create a new story segment based on player choice
   const createStorySegment = useCallback(
     async (gameId, choiceData) => {
+      let progressInterval;
+      
       try {
         if (!state.apiKey) {
           throw new Error("LLM API key is required for story generation");
@@ -736,7 +728,7 @@ export const GameProvider = ({ children }) => {
         }
 
         // Simulate progressive loading for better UX
-        const progressInterval = setInterval(() => {
+        progressInterval = setInterval(() => {
           setLoadingProgress((prev) => {
             if (prev >= 90) {
               clearInterval(progressInterval);
@@ -804,7 +796,9 @@ export const GameProvider = ({ children }) => {
         setError(error.message || "Failed to generate story segment");
         return null;
       } finally {
-        clearInterval(progressInterval);
+        if (progressInterval) {
+          clearInterval(progressInterval);
+        }
       }
     },
     [

@@ -113,9 +113,12 @@ export const ThemeProvider = ({ children }) => {
     savedCrtLevel !== null ? parseFloat(savedCrtLevel) : 0.5
   );
   const [textAdventureOpen, setTextAdventureOpen] = useState(false); // Track if text adventure is open
+  
+  // Track the last applied theme for comparison
+  const [lastAppliedTheme, setLastAppliedTheme] = useState(null);
 
   // Generate the active theme by combining base theme with genre theme if applicable
-  const getActiveTheme = () => {
+  const getActiveTheme = useCallback(() => {
     // Start with the base theme
     let theme = { ...baseTheme };
 
@@ -127,30 +130,32 @@ export const ThemeProvider = ({ children }) => {
     // If a special theme is selected (like highContrast), use that instead
     if (currentTheme !== "win95" && accessibilityThemes[currentTheme]) {
       theme = { ...accessibilityThemes[currentTheme] };
+    } else if (currentTheme !== "win95" && genreThemes[currentTheme]) {
+      // If theme is a genre name but not set as currentGenre
+      theme = { ...theme, ...genreThemes[currentTheme] };
     }
 
     // Apply user CRT effect preference
     theme.crtEffectLevel = crtEffectLevel;
 
     return theme;
-  };
+  }, [currentTheme, currentGenre, crtEffectLevel]);
 
   // Force a reapplication of the theme (for fixing issues)
   const forceThemeReapplication = useCallback(() => {
     const theme = getActiveTheme();
     applyThemeToDOM(theme);
+    setLastAppliedTheme(JSON.stringify(theme));
     console.log("Theme forcibly reapplied:", theme.name);
   }, [getActiveTheme]);
 
   // Apply the theme to CSS variables
-  const applyThemeToDOM = (theme) => {
+  const applyThemeToDOM = useCallback((theme) => {
     const root = document.documentElement;
 
     // Log for debugging
     console.log("Applying theme:", theme.name);
-    console.log("Desktop color:", theme.desktop);
-    console.log("Window header color:", theme.windowHeader);
-
+    
     // Set CSS variables
     root.style.setProperty("--win95-bg", theme.desktop);
     root.style.setProperty("--win95-window-bg", theme.window);
@@ -165,20 +170,127 @@ export const ThemeProvider = ({ children }) => {
     root.style.setProperty("--win95-scrollbar-thumb", theme.scrollbarThumb);
     root.style.setProperty("--win95-icon", theme.icon);
 
-    // Apply CRT effect level class
+    // Apply CRT effect level
+    root.style.setProperty("--crt-effect-level", theme.crtEffectLevel);
+    
+    // Apply appropriate CRT effect class
     if (theme.crtEffectLevel <= 0) {
       root.classList.add("crt-effect-disabled");
     } else {
       root.classList.remove("crt-effect-disabled");
-      root.style.setProperty("--crt-effect-level", theme.crtEffectLevel);
+      applyCRTEffect(theme.crtEffectLevel);
     }
-  };
+  }, []);
+  
+  // Apply CRT effect with the given intensity
+  const applyCRTEffect = useCallback((level) => {
+    const root = document.documentElement;
+    
+    // Remove any existing CRT effect styles
+    const existingStyle = document.getElementById('crt-effect-style');
+    if (existingStyle) {
+      existingStyle.remove();
+    }
+    
+    // Skip if level is 0
+    if (level <= 0) {
+      root.classList.add("crt-effect-disabled");
+      return;
+    }
+    
+    // Remove disabled class
+    root.classList.remove("crt-effect-disabled");
+    
+    // Create and apply CRT effect styles
+    const style = document.createElement('style');
+    style.id = 'crt-effect-style';
+    
+    // Scale effect intensity based on level
+    const scanlineOpacity = 0.15 * level;
+    const glowRadius = 6 * level;
+    const glowOpacity = 0.15 * level;
+    
+    style.textContent = `
+      /* CRT Scanlines */
+      .crt-screen {
+        position: relative;
+      }
+      .crt-screen::before {
+        content: "";
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(
+          rgba(18, 16, 16, 0) 50%, 
+          rgba(0, 0, 0, ${scanlineOpacity}) 50%
+        );
+        background-size: 100% 4px;
+        pointer-events: none;
+        z-index: 9999;
+      }
+      
+      /* CRT Glow */
+      .crt-screen::after {
+        content: "";
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        box-shadow: 
+          inset 0 0 ${glowRadius}px rgba(0, 30, 255, ${glowOpacity}),
+          inset 0 0 ${glowRadius/2}px rgba(0, 30, 255, ${glowOpacity});
+        pointer-events: none;
+        z-index: 9998;
+      }
+      
+      /* RGB Effect */
+      .rgb-effect {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: repeating-linear-gradient(
+          to right,
+          rgba(255, 0, 0, 0.03),
+          rgba(0, 255, 0, 0.03),
+          rgba(0, 0, 255, 0.03)
+        );
+        pointer-events: none;
+        z-index: 9997;
+      }
+    `;
+    
+    document.head.appendChild(style);
+    
+    // Add the CRT class to the body for global effect
+    document.body.classList.add('crt-screen');
+    
+    // Create RGB effect element if it doesn't exist
+    if (!document.querySelector('.rgb-effect')) {
+      const rgbEffect = document.createElement('div');
+      rgbEffect.className = 'rgb-effect';
+      document.body.appendChild(rgbEffect);
+    }
+    
+  }, []);
 
-  // Apply the theme to CSS variables
+  // Apply the theme to CSS variables whenever theme components change
   useEffect(() => {
     const theme = getActiveTheme();
-    applyThemeToDOM(theme);
-
+    const themeString = JSON.stringify(theme);
+    
+    // Only apply if theme has changed
+    if (themeString !== lastAppliedTheme) {
+      applyThemeToDOM(theme);
+      setLastAppliedTheme(themeString);
+    }
+    
     // Save preferences to localStorage
     localStorage.setItem("win95_theme", currentTheme);
     if (currentGenre) {
@@ -187,16 +299,33 @@ export const ThemeProvider = ({ children }) => {
       localStorage.removeItem("win95_current_genre");
     }
     localStorage.setItem("win95_crt_effect_level", crtEffectLevel.toString());
-  }, [currentTheme, currentGenre, crtEffectLevel]);
+  }, [currentTheme, currentGenre, crtEffectLevel, getActiveTheme, applyThemeToDOM, lastAppliedTheme]);
 
   // Initial application of theme after component mount
   useEffect(() => {
     // Force theme application on first render
     const theme = getActiveTheme();
+    const themeString = JSON.stringify(theme);
+    
     setTimeout(() => {
       applyThemeToDOM(theme);
+      setLastAppliedTheme(themeString);
       console.log("Initial theme applied");
     }, 100);
+    
+    // Cleanup on unmount - remove CRT effects
+    return () => {
+      const existingStyle = document.getElementById('crt-effect-style');
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+      
+      document.body.classList.remove('crt-screen');
+      const rgbEffect = document.querySelector('.rgb-effect');
+      if (rgbEffect) {
+        rgbEffect.remove();
+      }
+    };
   }, []); // Empty dependency array for initial run only
 
   // Change theme based on game genre
@@ -234,7 +363,7 @@ export const ThemeProvider = ({ children }) => {
         console.log("Default theme forcibly reapplied");
       }, 50);
     }
-  }, [textAdventureOpen]);
+  }, [textAdventureOpen, getActiveTheme, applyThemeToDOM]);
 
   // Change to a specific theme (like highContrast)
   const applySpecificTheme = useCallback((themeName) => {
@@ -247,19 +376,26 @@ export const ThemeProvider = ({ children }) => {
       applyThemeToDOM(theme);
       console.log("Specific theme forcibly reapplied");
     }, 50);
-  }, []);
+  }, [getActiveTheme, applyThemeToDOM]);
 
   // Update CRT effect level
   const updateCrtEffectLevel = useCallback((level) => {
     // Ensure level is between 0 and 1
     const normalizedLevel = Math.max(0, Math.min(1, level));
     setCrtEffectLevel(normalizedLevel);
-  }, []);
+    
+    // Apply effect immediately
+    applyCRTEffect(normalizedLevel);
+  }, [applyCRTEffect]);
 
   // Toggle CRT effect on/off
   const toggleCrtEffect = useCallback(() => {
-    setCrtEffectLevel((prevLevel) => (prevLevel > 0 ? 0 : 0.5));
-  }, []);
+    setCrtEffectLevel((prevLevel) => {
+      const newLevel = prevLevel > 0 ? 0 : 0.5;
+      applyCRTEffect(newLevel);
+      return newLevel;
+    });
+  }, [applyCRTEffect]);
 
   // Reset to default theme
   const resetTheme = useCallback(() => {
@@ -273,7 +409,7 @@ export const ThemeProvider = ({ children }) => {
       applyThemeToDOM(theme);
       console.log("Theme reset to default");
     }, 50);
-  }, []);
+  }, [getActiveTheme, applyThemeToDOM]);
 
   // Context value
   const value = {
@@ -290,6 +426,8 @@ export const ThemeProvider = ({ children }) => {
     crtEffectLevel,
     textAdventureOpen,
     setTextAdventureOpen,
+    genreThemes: Object.keys(genreThemes),
+    accessibilityThemes: Object.keys(accessibilityThemes),
   };
 
   return (

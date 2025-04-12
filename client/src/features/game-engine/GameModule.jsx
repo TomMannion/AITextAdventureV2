@@ -26,7 +26,7 @@ const GameModule = (props) => {
     clearError,
   } = useGameContext();
 
-  const { applyGenreTheme, restoreDefaultTheme } = useThemeContext();
+  const { restoreDefaultTheme } = useThemeContext();
   const { showError } = useNotification();
 
   // Initialize games once when component mounts - this ensures games are loaded
@@ -51,20 +51,14 @@ const GameModule = (props) => {
     };
   }, [error, clearError]);
 
-  // Set theme based on game genre when component mounts
-  // and reset when component unmounts
+  // Only keep the cleanup function to reset theme when component unmounts
   useEffect(() => {
-    if (currentGame && currentGame.genre) {
-      // Apply the genre theme
-      applyGenreTheme(currentGame.genre);
-    }
-
     // Cleanup function that runs when component unmounts
     return () => {
       // Restore the default theme when game module closes
       restoreDefaultTheme();
     };
-  }, [currentGame, applyGenreTheme, restoreDefaultTheme]);
+  }, [restoreDefaultTheme]);
 
   // Handle game state based on context status
   const renderGameState = () => {
