@@ -1,120 +1,74 @@
-// src/features/game-engine/GameModule.jsx
-import React, { useEffect } from "react";
-import { useGameContext } from "../../contexts/GameContext";
-import { useThemeContext } from "../../contexts/ThemeContext";
-import { useNotification } from "../../contexts/NotificationContext";
-import GameLauncher from "./components/GameLauncher";
-import GameCreator from "./components/GameCreator";
-import GameBrowser from "./components/GameBrowser";
-import GameStateManager from "./components/GameStateManager";
-import EmptyGameState from "./components/EmptyGameState";
+import React, { useEffect } from 'react';
+import { GameFlowProvider, useGameFlow, FLOW_STATES } from './contexts/GameFlowContext';
+import { GameDataProvider, useGameData } from './contexts/GameDataContext';
+import { useThemeContext } from '../../contexts/ThemeContext';
+
+// Import components
+import GameLauncher from './components/launcher/GameLauncher';
+import GameCreator from './components/creation/GameCreator';
+import GameBrowser from './components/browser/GameBrowser';
+import GamePlayer from './components/player/GamePlayer';
+import GameCompletion from './components/player/GameCompletion';
+import ErrorDisplay from './components/shared/ErrorDisplay';
+import LoadingScreen from './components/shared/LoadingScreen';
 
 /**
- * GameModule - Main component that renders the appropriate game interface
- * based on the current game status - with theme handling
+ * Game content renderer - displays the appropriate screen based on flow state
  */
-const GameModule = (props) => {
-  const {
-    status,
-    error,
-    currentGame,
-    gamesInitialized,
-    gameList,
-    fetchGames,
-    segments,
-    startNewGame,
-    clearError,
-  } = useGameContext();
-
-  const { restoreDefaultTheme } = useThemeContext();
-  const { showError } = useNotification();
-
-  // Initialize games once when component mounts - this ensures games are loaded
-  // even if we navigate directly to a specific view
+const GameContent = () => {
+  const { flowState, error } = useGameFlow();
+  const { isLoading, loadingMessage, progress, currentGame } = useGameData();
+  
+  // Initialize games when component mounts
+  const { fetchGames, initialized } = useGameData();
+  
   useEffect(() => {
-    // Initialize game list exactly once at the module level
-    if (!gamesInitialized) {
-      console.log("GameModule: Initializing game list data (one-time)");
-      fetchGames().catch((err) => {
-        console.error("Failed to fetch games:", err);
-        showError("Failed to load your adventures. Please try again later.");
-      });
+    if (!initialized) {
+      fetchGames().catch(console.error);
     }
-  }, [gamesInitialized, fetchGames, showError]);
-
-  // Clean up errors when component unmounts
-  useEffect(() => {
-    return () => {
-      if (error) {
-        clearError();
-      }
-    };
-  }, [error, clearError]);
-
-  // Only keep the cleanup function to reset theme when component unmounts
-  useEffect(() => {
-    // Cleanup function that runs when component unmounts
-    return () => {
-      // Restore the default theme when game module closes
-      restoreDefaultTheme();
-    };
-  }, [restoreDefaultTheme]);
-
-  // Handle game state based on context status
-  const renderGameState = () => {
-    switch (status) {
-      case "creating":
-        return <GameCreator {...props} />;
-
-      case "browsing":
-        // Show different state if no games exist
-        if (gamesInitialized && (!gameList || gameList.length === 0)) {
-          return (
-            <EmptyGameState
-              onCreateNew={startNewGame}
-              onRefresh={() => fetchGames(true)}
-            />
-          );
-        }
-        return <GameBrowser {...props} />;
-
-      case "loading":
-        // If we're loading but have a current game, go to state manager
-        if (currentGame) {
-          return <GameStateManager {...props} />;
-        }
-        // Otherwise show the browser with loading state
-        return <GameBrowser {...props} />;
-
-      case "playing":
-        // Use the state manager to handle different game stages
-        return <GameStateManager {...props} />;
-
-      case "error":
-        // Show error with different handling based on context
-        if (currentGame) {
-          return <GameStateManager {...props} />;
-        } else {
-          return (
-            <EmptyGameState
-              message={`Error: ${error}`}
-              onCreateNew={startNewGame}
-              onRefresh={() => {
-                clearError();
-                fetchGames(true);
-              }}
-            />
-          );
-        }
-
-      case "idle":
-      default:
-        return <GameLauncher {...props} />;
-    }
-  };
-
-  return renderGameState();
+  }, [fetchGames, initialized]);
+  
+  // Show loading screen if loading
+  if (isLoading) {
+    return <LoadingScreen message={loadingMessage} progress={progress} />;
+  }
+  
+  // Show error screen if error
+  if (flowState === FLOW_STATES.ERROR && error) {
+    return <ErrorDisplay message={error} />;
+  }
+  
+  // Render appropriate component based on flow state
+  switch (flowState) {
+    case FLOW_STATES.CREATOR:
+      return <GameCreator />;
+      
+    case FLOW_STATES.BROWSER:
+      return <GameBrowser />;
+      
+    case FLOW_STATES.PLAYER:
+      return <GamePlayer />;
+      
+    case FLOW_STATES.COMPLETED:
+      return <GameCompletion game={currentGame} />;
+      
+    case FLOW_STATES.LAUNCHER:
+    default:
+      return <GameLauncher />;
+  }
 };
 
-// Use React.memo to prevent unnecessary re-renders
-export default React.memo(GameModule);
+/**
+ * Main Game Module component with providers
+ */
+const GameModule = () => {
+  return (
+    <GameFlowProvider>
+      <GameDataProvider>
+        <GameContent />
+      </GameDataProvider>
+    </GameFlowProvider>
+  );
+};
+
+export default GameModule;

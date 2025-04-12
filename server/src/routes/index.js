@@ -3,6 +3,7 @@ import userRoutes from "./userRoutes.js";
 import gameRoutes from "./gameRoutes.js";
 import storyRoutes from "./storyRoutes.js";
 import optionRoutes from "./optionRoutes.js";
+import modelRoutes from "./modelRoutes.js";
 import { ApiError } from "../middleware/errorMiddleware.js";
 
 const router = express.Router();
@@ -28,6 +29,7 @@ router.use("/users", userRoutes);
 router.use("/games", gameRoutes);
 router.use("/story", storyRoutes);
 router.use("/options", optionRoutes);
+router.use("/models", modelRoutes);
 
 // API documentation route (optional)
 router.get("/", (req, res) => {

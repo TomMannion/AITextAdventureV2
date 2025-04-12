@@ -79,6 +79,28 @@ apiClient.interceptors.response.use(
   }
 );
 
+// Model Service
+const modelService = {
+  /**
+   * Get available models from a specific LLM provider
+   * @param {string} provider - Provider name (openai, anthropic, groq, gemini)
+   * @param {string} apiKey - API key for the provider
+   * @returns {Promise<Array>} List of models
+   */
+  getProviderModels: async (provider, apiKey) => {
+    try {
+      return await apiClient.get(`/models/${provider}`, {
+        headers: {
+          'x-llm-api-key': apiKey
+        }
+      });
+    } catch (error) {
+      console.error(`Error fetching models for ${provider}:`, error);
+      throw error;
+    }
+  }
+};
+
 // Game Service
 const gameService = {
   /**
@@ -440,4 +462,4 @@ const gameService = {
   },
 };
 
-export { apiClient, gameService };
+export { apiClient, gameService, modelService };

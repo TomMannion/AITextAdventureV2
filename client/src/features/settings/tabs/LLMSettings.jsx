@@ -5,6 +5,7 @@ import { win95Border } from "../../../utils/styleUtils";
 import Text from "../../../components/common/Text";
 import Button from "../../../components/common/Button";
 import { useSettings } from "../../../contexts/SettingsContext";
+import modelService from "../../../services/modelService";
 
 // Styled components
 const SettingsSection = styled.div`
@@ -82,8 +83,56 @@ const TestResultContainer = styled.div`
   padding: 8px;
   ${win95Border("inset")}
   background-color: ${(props) =>
-    props.$success ? "#e0ffe0" : props.$error ? "#ffe0e0" : "white"};
+    props.$success ? "#e0ffe0" : props.$error ? "#ffe0e0" : "#f0f0f0"};
   font-size: 12px;
+`;
+
+const InfoBanner = styled.div`
+  margin-top: 15px;
+  padding: 8px;
+  ${win95Border("outset")}
+  background-color: #ffffd0; 
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+
+  &:before {
+    content: "i";
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 8px;
+    width: 16px;
+    height: 16px;
+    background-color: #0000aa;
+    color: white;
+    font-weight: bold;
+    border-radius: 50%;
+  }
+`;
+
+const LoadingIndicator = styled.div`
+  margin-top: 5px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  color: #666;
+
+  &:before {
+    content: "";
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 8px;
+    border: 2px solid #ccc;
+    border-top-color: #666;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
 `;
 
 /**
@@ -94,30 +143,71 @@ const LLMSettings = () => {
   const [localSettings, setLocalSettings] = useState(settings.llm);
   const [testStatus, setTestStatus] = useState(null);
   const [testMessage, setTestMessage] = useState("");
+  const [models, setModels] = useState([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [modelError, setModelError] = useState(null);
 
   // Update local state when settings change
   useEffect(() => {
     setLocalSettings(settings.llm);
   }, [settings.llm]);
 
-  // Handle changes with debounce
+  // Fetch models from provider
+  const fetchModels = useCallback(async (provider, apiKey) => {
+    if (!apiKey) {
+      setModelError("API key is required to fetch available models");
+      return;
+    }
+
+    setIsLoadingModels(true);
+    setModelError(null);
+
+    try {
+      const modelsList = await modelService.getProviderModels(provider, apiKey);
+      setModels(modelsList);
+      
+      // If there are models and current model is empty, select the first model
+      if (modelsList.length > 0 && (!localSettings.model || !modelsList.some(m => m.id === localSettings.model))) {
+        setLocalSettings(prev => ({
+          ...prev,
+          model: modelsList[0].id
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching models:", error);
+      setModelError(error.message || "Failed to fetch models from provider");
+      // Keep static model list as fallback
+      setModels(getStaticModelsForProvider(provider));
+    } finally {
+      setIsLoadingModels(false);
+    }
+  }, [localSettings.model]);
+
+  // Fetch models when provider or API key changes
+  useEffect(() => {
+    if (localSettings.apiKey) {
+      fetchModels(localSettings.provider, localSettings.apiKey);
+    }
+  }, [localSettings.provider, localSettings.apiKey, fetchModels]);
+
+  // Handle input changes
   const handleChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
     const newValue = type === "checkbox" ? checked : value;
 
-    setLocalSettings((prev) => {
-      // If provider changed, reset model to a default for that provider
+    setLocalSettings(prev => {
+      // If provider changed, reset model
       if (name === "provider") {
         return {
           ...prev,
           [name]: newValue,
-          model: getDefaultModelForProvider(newValue),
+          model: "" // Reset model until we fetch new ones
         };
       }
 
       return {
         ...prev,
-        [name]: newValue,
+        [name]: newValue
       };
     });
   }, []);
@@ -131,58 +221,80 @@ const LLMSettings = () => {
     return () => clearTimeout(timer);
   }, [localSettings, updateSettings]);
 
-  // Get default model for a provider
-  const getDefaultModelForProvider = (provider) => {
-    switch (provider) {
-      case "groq":
-        return "llama-3.1-8b-instant";
-      case "anthropic":
-        return "claude-3-sonnet-20240229";
-      case "openai":
-        return "gpt-4-turbo";
-      case "gemini":
-        return "gemini-2.0-flash";
-      default:
-        return "";
+  // Test API key
+  const handleTestApiKey = useCallback(async () => {
+    if (!localSettings.apiKey?.trim()) {
+      setTestStatus("error");
+      setTestMessage("API key cannot be empty");
+      return;
     }
-  };
 
-  // Get available models for the selected provider
-  const getModelsForProvider = (provider) => {
+    setTestStatus("loading");
+    setTestMessage("Testing connection to provider...");
+
+    try {
+      // Actually test the API key by trying to fetch models
+      await modelService.getProviderModels(localSettings.provider, localSettings.apiKey);
+      setTestStatus("success");
+      setTestMessage("Connection successful! API key is valid.");
+    } catch (error) {
+      setTestStatus("error");
+      setTestMessage(error.message || "Failed to connect with this API key");
+    }
+  }, [localSettings.provider, localSettings.apiKey]);
+
+  // Refresh models
+  const handleRefreshModels = useCallback(() => {
+    fetchModels(localSettings.provider, localSettings.apiKey);
+  }, [localSettings.provider, localSettings.apiKey, fetchModels]);
+
+  // Get static models as fallback for a provider
+  const getStaticModelsForProvider = (provider) => {
     switch (provider) {
       case "groq":
         return [
-          { value: "llama-3.1-8b-instant", label: "LLaMA 3.1 8B Instant" },
-          { value: "llama-3.1-70b-instant", label: "LLaMA 3.1 70B Instant" },
-          { value: "mixtral-8x7b-32768", label: "Mixtral 8x7B-32768" },
+          { id: "llama-3.1-8b-instant", name: "LLaMA 3.1 8B Instant" },
+          { id: "llama-3.1-70b-instant", name: "LLaMA 3.1 70B Instant" },
+          { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B-32768" },
         ];
       case "anthropic":
         return [
-          { value: "claude-3-opus-20240229", label: "Claude 3 Opus" },
-          { value: "claude-3-sonnet-20240229", label: "Claude 3 Sonnet" },
-          { value: "claude-3-haiku-20240307", label: "Claude 3 Haiku" },
-          { value: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
+          { id: "claude-3-opus-20240229", name: "Claude 3 Opus" },
+          { id: "claude-3-sonnet-20240229", name: "Claude 3 Sonnet" },
+          { id: "claude-3-haiku-20240307", name: "Claude 3 Haiku" },
+          { id: "claude-3.5-sonnet", name: "Claude 3.5 Sonnet" },
         ];
       case "openai":
         return [
-          { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
-          { value: "gpt-4", label: "GPT-4" },
-          { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
-          { value: "gpt-4o", label: "GPT-4o" },
+          { id: "gpt-4-turbo", name: "GPT-4 Turbo" },
+          { id: "gpt-4", name: "GPT-4" },
+          { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo" },
+          { id: "gpt-4o", name: "GPT-4o" },
         ];
       case "gemini":
         return [
-          { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
-          { value: "gemini-2.0-pro", label: "Gemini 2.0 Pro" },
-          { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
+          { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+          { id: "gemini-2.0-pro", name: "Gemini 2.0 Pro" },
+          { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro" },
         ];
       default:
-        return [{ value: "", label: "Select a provider first" }];
+        return [];
     }
   };
 
   // Get description for the selected model
-  const getModelDescription = (provider, model) => {
+  const getModelDescription = (provider, modelId) => {
+    // Try to find model in fetched models first
+    const selectedModel = models.find(m => m.id === modelId);
+    if (selectedModel) {
+      const contextWindow = selectedModel.context_window 
+        ? `Context window: ${Number(selectedModel.context_window).toLocaleString()} tokens. ` 
+        : '';
+      
+      return `${selectedModel.name || selectedModel.id}. ${contextWindow}${selectedModel.description || ''}`;
+    }
+
+    // Fallback to static descriptions
     const descriptions = {
       groq: {
         "llama-3.1-8b-instant":
@@ -223,36 +335,10 @@ const LLMSettings = () => {
     };
 
     return (
-      descriptions[provider]?.[model] ||
+      descriptions[provider]?.[modelId] ||
       "No description available for this model."
     );
   };
-
-  // Test API key
-  const handleTestApiKey = useCallback(() => {
-    setTestStatus("loading");
-    setTestMessage("Testing connection to provider...");
-
-    // Simulate API call
-    setTimeout(() => {
-      if (!localSettings.apiKey?.trim()) {
-        setTestStatus("error");
-        setTestMessage("API key cannot be empty");
-        return;
-      }
-
-      if (localSettings.apiKey.length < 8) {
-        setTestStatus("error");
-        setTestMessage("API key seems too short. Please check your key.");
-        return;
-      }
-
-      // This is just a simulation - in a real app, you'd make an actual API call
-      // to verify the key works with the chosen provider
-      setTestStatus("success");
-      setTestMessage("Connection successful! API key appears to be valid.");
-    }, 1500);
-  }, [localSettings.apiKey]);
 
   return (
     <div>
@@ -283,21 +369,41 @@ const LLMSettings = () => {
 
         <FormGroup>
           <Label htmlFor="model">Model:</Label>
+          {isLoadingModels ? (
+            <LoadingIndicator>Loading available models...</LoadingIndicator>
+          ) : modelError && !models.length ? (
+            <InfoBanner>{modelError}</InfoBanner>
+          ) : null}
+          
           <Select
             id="model"
             name="model"
             value={localSettings.model}
             onChange={handleChange}
+            disabled={isLoadingModels || models.length === 0}
           >
-            {getModelsForProvider(localSettings.provider).map((model) => (
-              <option key={model.value} value={model.value}>
-                {model.label}
+            {models.length === 0 && <option value="">Select a model</option>}
+            {models.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.name || model.id}
               </option>
             ))}
           </Select>
 
+          {models.length > 0 && (
+            <Button 
+              onClick={handleRefreshModels} 
+              disabled={isLoadingModels || !localSettings.apiKey}
+              style={{ marginTop: '5px', marginBottom: '10px' }}
+            >
+              Refresh Models
+            </Button>
+          )}
+
           <ModelDescription>
-            {getModelDescription(localSettings.provider, localSettings.model)}
+            {localSettings.model
+              ? getModelDescription(localSettings.provider, localSettings.model)
+              : "Select a model to see its description."}
           </ModelDescription>
         </FormGroup>
       </SettingsSection>

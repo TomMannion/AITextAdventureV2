@@ -10,6 +10,191 @@ import { ApiError } from "../middleware/errorMiddleware.js";
  */
 class AiService {
   /**
+   * Get available models from a provider
+   * @param {Object} options - Configuration options
+   * @param {string} options.provider - LLM provider name (openai, anthropic, groq, gemini)
+   * @param {string} options.apiKey - API key for the provider
+   * @returns {Promise<Array>} List of available models
+   */
+  async getAvailableModels(options) {
+    // Validate required options
+    if (!options.provider || !options.apiKey) {
+      throw new ApiError(400, "Missing required provider or API key");
+    }
+
+    // Convert provider to lowercase
+    const provider = options.provider.toLowerCase();
+
+    // Choose method based on provider
+    switch (provider) {
+      case "openai":
+        return this.getOpenAIModels(options.apiKey);
+      case "anthropic":
+        return this.getAnthropicModels(options.apiKey);
+      case "groq":
+        return this.getGroqModels(options.apiKey);
+      case "gemini":
+        return this.getGeminiModels(options.apiKey);
+      default:
+        throw new ApiError(400, `Unsupported AI provider: ${provider}`);
+    }
+  }
+
+  /**
+   * Get available models from OpenAI
+   */
+  async getOpenAIModels(apiKey) {
+    try {
+      const openai = new OpenAI({ apiKey });
+      const response = await openai.models.list();
+      
+      return response.data.map(model => ({
+        id: model.id,
+        name: model.id,
+        created: model.created,
+        owned_by: model.owned_by,
+        // Add estimated context window
+        context_window: this.getContextWindowForModel(model.id, "openai")
+      }));
+    } catch (error) {
+      this.handleSdkError(error, "OpenAI");
+    }
+  }
+
+  /**
+   * Get available models from Anthropic
+   */
+  async getAnthropicModels(apiKey) {
+    try {
+      const anthropic = new Anthropic({ apiKey });
+      const response = await anthropic.models.list();
+      
+      return response.data.map(model => ({
+        id: model.id,
+        name: model.display_name || model.id,
+        created: new Date(model.created_at).getTime() / 1000, // Convert to Unix timestamp
+        owned_by: "Anthropic",
+        // Add estimated context window
+        context_window: this.getContextWindowForModel(model.id, "anthropic")
+      }));
+    } catch (error) {
+      this.handleSdkError(error, "Anthropic");
+    }
+  }
+
+  /**
+   * Get available models from Groq
+   */
+  async getGroqModels(apiKey) {
+    try {
+      // Create a fresh Groq instance for each request
+      const groq = new Groq({ apiKey });
+      const response = await groq.models.list();
+      
+      return response.data.map(model => ({
+        id: model.id,
+        name: model.id,
+        created: model.created,
+        owned_by: model.owned_by,
+        context_window: model.context_window || this.getContextWindowForModel(model.id, "groq")
+      }));
+    } catch (error) {
+      this.handleSdkError(error, "Groq");
+    }
+  }
+
+  /**
+   * Get available models from Google Gemini
+   */
+  async getGeminiModels(apiKey) {
+    try {
+      // Import the Google Generative AI SDK
+      const { GoogleGenerativeAI } = await import("@google/generative-ai");
+      
+      // We need to use fetch directly as the SDK doesn't have a list models function
+      const fetch = await import("node-fetch");
+      const response = await fetch.default(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || `Gemini API error: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      return data.models.map(model => ({
+        id: model.name.replace("models/", ""),
+        name: model.displayName || model.name,
+        created: null, // Gemini doesn't provide creation date
+        owned_by: "Google",
+        context_window: model.inputTokenLimit || this.getContextWindowForModel(model.name, "gemini")
+      }));
+    } catch (error) {
+      this.handleSdkError(error, "Gemini");
+    }
+  }
+
+  /**
+   * Get context window size for a model
+   * @param {string} modelId - Model identifier
+   * @param {string} provider - Provider name
+   * @returns {number} Context window size
+   */
+  getContextWindowForModel(modelId, provider) {
+    // Common context windows for popular models
+    const contextWindows = {
+      // OpenAI models
+      "gpt-3.5-turbo": 16385,
+      "gpt-4": 8192,
+      "gpt-4-32k": 32768,
+      "gpt-4-turbo": 128000,
+      "gpt-4o": 128000,
+      
+      // Anthropic models
+      "claude-3-opus": 200000,
+      "claude-3-sonnet": 200000,
+      "claude-3-haiku": 200000,
+      "claude-2": 100000,
+      "claude-2.1": 200000,
+      "claude-3.5-sonnet": 200000,
+      
+      // Groq models
+      "llama3-8b-8192": 8192,
+      "llama3-70b-8192": 8192,
+      "mixtral-8x7b-32768": 32768,
+      
+      // Gemini models
+      "gemini-1.0-pro": 32000,
+      "gemini-1.5-flash": 1000000,
+      "gemini-1.5-pro": 1000000,
+    };
+    
+    // Check for exact match
+    if (contextWindows[modelId]) {
+      return contextWindows[modelId];
+    }
+    
+    // Check for partial match by prefix
+    for (const [key, size] of Object.entries(contextWindows)) {
+      if (modelId.startsWith(key)) {
+        return size;
+      }
+    }
+    
+    // Default values by provider
+    const defaults = {
+      "openai": 4096,
+      "anthropic": 100000,
+      "groq": 8192,
+      "gemini": 32000
+    };
+    
+    return defaults[provider] || 4096;
+  }
+
+  /**
    * Generate JSON response using an LLM provider
    * @param {Object} options - Configuration options
    * @param {string} options.provider - LLM provider name (openai, anthropic, groq)
@@ -313,78 +498,6 @@ class AiService {
   }
 
   /**
-   * Generate text using OpenAI SDK (legacy method)
-   */
-  async generateTextWithOpenAI(options, promptData) {
-    const { apiKey, modelId } = options;
-    const { messages, temperature, maxTokens } = promptData;
-    const providerConfig = config.ai.providers.openai;
-
-    try {
-      const openai = new OpenAI({ apiKey });
-
-      const response = await openai.chat.completions.create({
-        model: modelId || providerConfig.defaultModel,
-        messages,
-        temperature: temperature || config.ai.prompts.temperature,
-        max_tokens: maxTokens || config.ai.prompts.maxTokens,
-      });
-
-      return response.choices[0].message.content;
-    } catch (error) {
-      this.handleSdkError(error, "OpenAI");
-    }
-  }
-
-  /**
-   * Generate text using Anthropic SDK (legacy method)
-   */
-  async generateTextWithAnthropic(options, promptData) {
-    const { apiKey, modelId } = options;
-    const { messages, temperature, maxTokens } = promptData;
-    const providerConfig = config.ai.providers.anthropic;
-
-    try {
-      const anthropic = new Anthropic({ apiKey });
-
-      const response = await anthropic.messages.create({
-        model: modelId || providerConfig.defaultModel,
-        messages,
-        temperature: temperature || config.ai.prompts.temperature,
-        max_tokens: maxTokens || config.ai.prompts.maxTokens,
-      });
-
-      return response.content[0].text;
-    } catch (error) {
-      this.handleSdkError(error, "Anthropic");
-    }
-  }
-
-  /**
-   * Generate text using Groq SDK (legacy method)
-   */
-  async generateTextWithGroq(options, promptData) {
-    const { apiKey, modelId } = options;
-    const { messages, temperature, maxTokens } = promptData;
-    const providerConfig = config.ai.providers.groq;
-
-    try {
-      const groq = new Groq({ apiKey });
-
-      const response = await groq.chat.completions.create({
-        model: modelId || providerConfig.defaultModel,
-        messages,
-        temperature: temperature || config.ai.prompts.temperature,
-        max_tokens: maxTokens || config.ai.prompts.maxTokens,
-      });
-
-      return response.choices[0].message.content;
-    } catch (error) {
-      this.handleSdkError(error, "Groq");
-    }
-  }
-
-  /**
    * Generate JSON using Google Gemini API
    */
   async generateJSONWithGemini(options, promptData) {
@@ -448,41 +561,6 @@ class AiService {
           throw new Error("Unable to parse JSON response from Gemini");
         }
       }
-    } catch (error) {
-      this.handleSdkError(error, "Gemini");
-    }
-  }
-
-  /**
-   * Generate plain text using Google Gemini API
-   */
-  async generateTextWithGemini(options, promptData) {
-    const { apiKey, modelId } = options;
-    const { messages, temperature, maxTokens } = promptData;
-    const providerConfig = config.ai.providers.gemini || {
-      defaultModel: "gemini-1.5-flash",
-    };
-
-    try {
-      // Import the Google Generative AI SDK
-      const { GoogleGenerativeAI } = await import("@google/generative-ai");
-      const genAI = new GoogleGenerativeAI(apiKey);
-
-      // Create a model instance
-      const model = genAI.getGenerativeModel({
-        model: modelId || providerConfig.defaultModel,
-        generationConfig: {
-          temperature: temperature || config.ai.prompts.temperature,
-          maxOutputTokens: maxTokens || config.ai.prompts.maxTokens,
-        },
-      });
-
-      // Format the messages for Gemini
-      const formattedPrompt = this.formatMessagesForGemini(messages);
-
-      // Generate content
-      const result = await model.generateContent(formattedPrompt);
-      return result.response.text();
     } catch (error) {
       this.handleSdkError(error, "Gemini");
     }

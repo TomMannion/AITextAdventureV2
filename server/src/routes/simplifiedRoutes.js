@@ -3,6 +3,7 @@ import userRoutes from "./userRoutes.js";
 import simplifiedGameRoutes from "./simplifiedGameRoutes.js";
 import simplifiedStoryRoutes from "./simplifiedStoryRoutes.js";
 import simplifiedOptionRoutes from "./simplifiedOptionRoutes.js";
+import modelRoutes from "./modelRoutes.js";
 import { ApiError } from "../middleware/errorMiddleware.js";
 
 const router = express.Router();
@@ -28,7 +29,7 @@ router.use("/users", userRoutes);
 router.use("/games", simplifiedGameRoutes);
 router.use("/story", simplifiedStoryRoutes);
 router.use("/options", simplifiedOptionRoutes);
-
+router.use("/models", modelRoutes);
 // API documentation route (optional)
 router.get("/", (req, res) => {
   res.status(200).json({
