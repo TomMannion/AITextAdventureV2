@@ -204,6 +204,12 @@ const gameService = {
   startGame: async (gameId, llmApiKey, preferences = {}) => {
     try {
       const id = typeof gameId === "string" ? parseInt(gameId, 10) : gameId;
+      console.log("[DEBUG] API service startGame:", {
+        gameId: id,
+        hasApiKey: !!llmApiKey,
+        preferences: preferences,
+        headers: gameService.withLLMKey(llmApiKey).headers,
+      });
 
       if (!llmApiKey) {
         return Promise.reject({

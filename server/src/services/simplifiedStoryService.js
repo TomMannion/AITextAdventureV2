@@ -13,6 +13,7 @@ class SimplifiedStoryService {
    * @returns {Promise<Object>} Updated game with initial story
    */
   async generateInitialStory(gameId, aiOptions) {
+    console.log(aiOptions);
     try {
       // Get the game data
       const game = await gameService.getGameById(gameId);

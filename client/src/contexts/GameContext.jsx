@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { useThemeContext } from "./ThemeContext";
 import { useNotification } from "./NotificationContext";
+import { useSettings } from "../contexts/SettingsContext";
 import { gameService } from "../services/api.service";
 
 // Initial state for game context
@@ -571,6 +572,9 @@ export const GameProvider = ({ children }) => {
   // Function to start a game (generate initial story segment)
   const startGame = useCallback(
     async (gameId) => {
+      // Declare progressInterval at the function scope level so it's accessible in all blocks
+      let progressInterval;
+
       try {
         if (!state.apiKey) {
           throw new Error("LLM API key is required for game start");
@@ -581,7 +585,7 @@ export const GameProvider = ({ children }) => {
         clearError(); // Clear any previous errors
 
         // Simulate progressive loading for better UX
-        const progressInterval = setInterval(() => {
+        progressInterval = setInterval(() => {
           setLoadingProgress((prev) => {
             if (prev >= 90) {
               clearInterval(progressInterval);
@@ -591,13 +595,45 @@ export const GameProvider = ({ children }) => {
           });
         }, 200);
 
-        console.log(`Starting game ${gameId} with API key`);
+        // Get settings from localStorage directly as a fallback approach
+        let llmSettings;
+        try {
+          const savedSettings = localStorage.getItem("app_settings");
+          if (savedSettings) {
+            const parsedSettings = JSON.parse(savedSettings);
+            llmSettings = parsedSettings.llm;
+            console.log(
+              "Retrieved LLM settings from localStorage:",
+              llmSettings
+            );
+          }
+        } catch (error) {
+          console.error("Error getting settings from localStorage:", error);
+        }
 
-        // Call the API to start the game
-        const response = await gameService.startGame(gameId, state.apiKey);
+        // Create preferences with the settings from localStorage
+        const preferences = {
+          preferredProvider: llmSettings?.provider || "groq",
+          preferredModel: llmSettings?.model || "llama-3.1-8b-instant",
+        };
+
+        console.log(
+          `Starting game ${gameId} with API key and preferences:`,
+          preferences
+        );
+
+        // Call the API with the preferences
+        const response = await gameService.startGame(
+          gameId,
+          state.apiKey,
+          preferences
+        );
         console.log("Start game response:", response);
 
-        clearInterval(progressInterval);
+        // Clear the interval once we have a response
+        if (progressInterval) {
+          clearInterval(progressInterval);
+        }
         setLoadingProgress(100);
 
         // Extract the data based on the API response structure
@@ -644,10 +680,19 @@ export const GameProvider = ({ children }) => {
         return response;
       } catch (error) {
         console.error("Failed to start game:", error);
+
+        // Clear the interval in case of error
+        if (progressInterval) {
+          clearInterval(progressInterval);
+        }
+
         setError(error.message || "Failed to start game");
         return null;
       } finally {
-        clearInterval(progressInterval);
+        // Ensure interval is always cleared, regardless of success or failure
+        if (progressInterval) {
+          clearInterval(progressInterval);
+        }
       }
     },
     [
