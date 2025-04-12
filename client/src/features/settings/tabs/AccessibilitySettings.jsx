@@ -4,7 +4,7 @@ import styled from "styled-components";
 import { win95Border } from "../../../utils/styleUtils";
 import Text from "../../../components/common/Text";
 import { useSettings } from "../../../contexts/SettingsContext";
-import { useThemeContext } from "../../../contexts/ThemeContext"; // Added import
+import { useThemeContext } from "../../../contexts/ThemeContext";
 
 // Styled components
 const SettingsSection = styled.div`
@@ -66,7 +66,7 @@ const ThemePreview = styled.div`
  */
 const AccessibilitySettings = () => {
   const { settings, updateSettings } = useSettings();
-  const { applySpecificTheme } = useThemeContext(); // Added useThemeContext
+  const { applySpecificTheme, updateCrtEffectLevel, crtEffectLevel } = useThemeContext();
   const [localSettings, setLocalSettings] = useState(settings.accessibility);
   const [previewHighContrast, setPreviewHighContrast] = useState(false);
 
@@ -97,6 +97,32 @@ const AccessibilitySettings = () => {
             applySpecificTheme("win95");
           }
         }
+        
+        // If disabling CRT effect, immediately disable it
+        if (name === "disableCrtEffect") {
+          // If checked, disable CRT by setting effect level to 0
+          // If unchecked, restore a default level of 0.5
+          updateCrtEffectLevel(checked ? 0 : 0.5);
+          
+          // Also remove any existing CRT overlay immediately
+          if (checked) {
+            const existingStyle = document.getElementById("crt-effect-style");
+            if (existingStyle) {
+              existingStyle.remove();
+            }
+            
+            const crtOverlay = document.getElementById("crt-overlay");
+            if (crtOverlay) {
+              crtOverlay.remove();
+            }
+            
+            // Add the disabled class to the root
+            document.documentElement.classList.add("crt-effect-disabled");
+          } else {
+            // Remove the disabled class if re-enabling
+            document.documentElement.classList.remove("crt-effect-disabled");
+          }
+        }
 
         // Update context directly here, after a short timeout to prevent circular updates
         setTimeout(() => {
@@ -106,7 +132,7 @@ const AccessibilitySettings = () => {
         return newSettings;
       });
     },
-    [updateSettings, applySpecificTheme]
+    [updateSettings, applySpecificTheme, updateCrtEffectLevel]
   );
 
   return (

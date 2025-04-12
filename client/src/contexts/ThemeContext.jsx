@@ -6,6 +6,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 
 // Base Windows 95 theme - classic colors ensured
@@ -67,6 +68,13 @@ const genreThemes = {
     scrollbarThumb: "#542900",
     icon: "#542900",
   },
+  win95: {
+    name: "win95",
+    desktop: "#008080", // Classic teal Windows 95 background
+    windowHeader: "#000080", // Classic Windows 95 blue header
+    scrollbarThumb: "#a0a0a0",
+    icon: "#000080",
+  }
 };
 
 // Additional accessibility themes
@@ -117,11 +125,22 @@ export const ThemeProvider = ({ children }) => {
 
   // Track the last applied theme for comparison
   const [lastAppliedTheme, setLastAppliedTheme] = useState(null);
+  
+  // Use ref to track theme application in flight
+  const themeApplicationInProgress = useRef(false);
 
   // Generate the active theme by combining base theme with genre theme if applicable
   const getActiveTheme = useCallback(() => {
     // Start with the base theme
     let theme = { ...baseTheme };
+
+    // For Windows 95 theme, we shouldn't have any genre overrides
+    if (currentTheme === "win95") {
+      // Ensure no genre overrides are applied
+      // Keep only base theme + CRT effect level
+      theme.crtEffectLevel = crtEffectLevel;
+      return theme;
+    }
 
     // If there's a genre override, merge those properties
     if (currentGenre && genreThemes[currentGenre]) {
@@ -144,10 +163,22 @@ export const ThemeProvider = ({ children }) => {
 
   // Force a reapplication of the theme (for fixing issues)
   const forceThemeReapplication = useCallback(() => {
+    // Prevent multiple rapid theme applications
+    if (themeApplicationInProgress.current) {
+      return;
+    }
+    
+    themeApplicationInProgress.current = true;
+    
     const theme = getActiveTheme();
     applyThemeToDOM(theme);
     setLastAppliedTheme(JSON.stringify(theme));
     console.log("Theme forcibly reapplied:", theme.name);
+    
+    // Release lock after a short delay
+    setTimeout(() => {
+      themeApplicationInProgress.current = false;
+    }, 100);
   }, [getActiveTheme]);
 
   // Apply the theme to CSS variables
@@ -343,27 +374,81 @@ const applyCRTEffect = useCallback((level) => {
     };
   }, []); // Empty dependency array for initial run only
 
-  // IMPROVED: Change theme based on game genre
+  // IMPROVED: Apply a specific theme (like win95 or highContrast)
+  const applySpecificTheme = useCallback(
+    (themeName) => {
+      // If applying Windows 95 theme, explicitly clear currentGenre
+      if (themeName === "win95") {
+        setCurrentTheme("win95");
+        setCurrentGenre(null); // Important: clear the genre when applying win95 theme
+        console.log("Explicitly applying Windows 95 theme and clearing genre");
+      } else {
+        setCurrentTheme(themeName);
+      }
+
+      // Force immediate theme application
+      setTimeout(() => {
+        const theme = getActiveTheme();
+        applyThemeToDOM(theme);
+        setLastAppliedTheme(JSON.stringify(theme));
+        
+        console.log(`Applied specific theme: ${themeName}, current genre: ${currentGenre}`);
+      }, 50);
+    },
+    [currentGenre, getActiveTheme, applyThemeToDOM]
+  );
+
+  // IMPROVED: Apply genre themes are applied correctly by setting both currentTheme and currentGenre
   const applyGenreTheme = useCallback(
     (genre) => {
+      if (genre === "win95") {
+        // Handle "win95" as a special case to make it selectable like any genre
+        setCurrentTheme("win95");
+        setCurrentGenre(null); // Clear genre for Windows 95
+        
+        console.log("Applying Windows 95 theme (treated as genre selection)");
+        
+        // Force immediate theme application
+        setTimeout(() => {
+          const theme = getActiveTheme();
+          applyThemeToDOM(theme);
+          setLastAppliedTheme(JSON.stringify(theme));
+        }, 50);
+        
+        return;
+      }
+      
       if (genreThemes[genre]) {
         // Store current genre before changing (for restoration)
         setPreviousGenre(currentGenre);
+        
+        // Set both the current genre and current theme for consistency
         setCurrentGenre(genre);
+        setCurrentTheme(genre);
+        
         // Mark text adventure as open when a genre theme is applied
         setTextAdventureOpen(true);
 
         console.log(`Applying genre theme: ${genre}`);
 
-        // Force theme application
+        // Force immediate theme application
         setTimeout(() => {
           const theme = getActiveTheme();
           applyThemeToDOM(theme);
+          setLastAppliedTheme(JSON.stringify(theme));
         }, 50);
       } else {
         // Default to base theme if genre not found
         setCurrentGenre(null);
-        console.log("Genre not found, using default theme");
+        setCurrentTheme("win95");
+        console.log("Genre not found, using default Windows 95 theme");
+        
+        // Apply default theme
+        setTimeout(() => {
+          const theme = getActiveTheme();
+          applyThemeToDOM(theme);
+          setLastAppliedTheme(JSON.stringify(theme));
+        }, 50);
       }
     },
     [currentGenre, getActiveTheme, applyThemeToDOM]
@@ -375,7 +460,7 @@ const applyCRTEffect = useCallback((level) => {
     if (textAdventureOpen) {
       // Reset to Windows 95 theme
       setCurrentTheme("win95");
-      setCurrentGenre(null);
+      setCurrentGenre(null); // Explicitly clear genre
       setTextAdventureOpen(false);
 
       // Apply the classic Windows 95 theme colors immediately
@@ -390,31 +475,16 @@ const applyCRTEffect = useCallback((level) => {
       setTimeout(() => {
         const theme = getActiveTheme();
         applyThemeToDOM(theme);
+        setLastAppliedTheme(JSON.stringify(theme));
         console.log("Default theme forcibly reapplied");
       }, 50);
     }
   }, [textAdventureOpen, getActiveTheme, applyThemeToDOM]);
 
-  // Apply a specific theme (like highContrast)
-  const applySpecificTheme = useCallback(
-    (themeName) => {
-      setCurrentTheme(themeName);
-      console.log(`Applying specific theme: ${themeName}`);
-
-      // Force a reapplication after a short delay
-      setTimeout(() => {
-        const theme = getActiveTheme();
-        applyThemeToDOM(theme);
-        console.log("Specific theme forcibly reapplied");
-      }, 50);
-    },
-    [getActiveTheme, applyThemeToDOM]
-  );
-
   // Update CRT effect level
   const updateCrtEffectLevel = useCallback(
     (level) => {
-      // Ensure level is between
+      // Ensure level is between 0 and 1
       const normalizedLevel = Math.max(0, Math.min(1, level));
       setCrtEffectLevel(normalizedLevel);
 

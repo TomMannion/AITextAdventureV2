@@ -1,5 +1,5 @@
 // src/features/settings/tabs/DisplaySettings.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { win95Border } from "../../../utils/styleUtils";
 import Text from "../../../components/common/Text";
@@ -119,41 +119,6 @@ const Slider = styled.input`
   }
 `;
 
-const NotificationPreview = styled.div`
-  ${win95Border("outset")}
-  margin-top: 20px;
-  background-color: #c0c0c0;
-  width: 100%;
-  max-width: 300px;
-`;
-
-const PreviewHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: #000080;
-  color: white;
-  padding: 3px 5px;
-  font-weight: bold;
-  font-size: 12px;
-`;
-
-const PreviewIcon = styled.img`
-  width: 16px;
-  height: 16px;
-  margin-right: 8px;
-`;
-
-const PreviewHeaderContent = styled.div`
-  display: flex;
-  align-items: center;
-`;
-
-const PreviewContent = styled.div`
-  padding: 8px;
-  font-size: 12px;
-`;
-
 const ThemePreviewGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -208,19 +173,32 @@ const PreviewTitle = styled.h3`
   font-size: 14px;
 `;
 
+// Desktop preview container with inline styles
+const DesktopPreview = styled.div`
+  width: 100%;
+  height: 80px;
+  background-color: ${(props) => props.$bgColor || "#008080"};
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
+
+// Window preview with inline styles
 const PreviewWindow = styled.div`
-  ${win95Border("outset")}
   width: 100%;
   height: 120px;
-  background-color: var(--win95-window-bg);
   position: relative;
   margin-bottom: 10px;
   overflow: hidden;
+  border: 2px solid #000000;
+  box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.3);
+  background-color: ${(props) => props.$bgColor || "#c0c0c0"};
 `;
 
-// Renamed from PreviewHeader to ThemePreviewHeader to avoid duplication
+// Window header with inline styles
 const ThemePreviewHeader = styled.div`
-  background-color: var(--win95-window-header);
+  background-color: ${(props) => props.$bgColor || "#000080"};
   color: white;
   padding: 3px 5px;
   font-weight: bold;
@@ -233,9 +211,11 @@ const ThemePreviewContent = styled.div`
   position: relative;
   height: calc(100% - 24px);
   overflow: hidden;
+  background-color: ${(props) => props.$bgColor || "#c0c0c0"};
+  color: ${(props) => props.$textColor || "#000000"};
 `;
 
-// CRT effect overlay for preview
+// CRT effect overlay with inline styles for preview
 const CRTOverlay = styled.div`
   position: absolute;
   top: 0;
@@ -243,14 +223,22 @@ const CRTOverlay = styled.div`
   right: 0;
   bottom: 0;
   pointer-events: none;
-  opacity: ${props => props.$intensity || 0.5};
-  background: linear-gradient(
-    rgba(18, 16, 16, 0) 50%, 
-    rgba(0, 0, 0, 0.25) 50%
-  );
+  opacity: ${(props) => props.$intensity || 0};
+  display: ${(props) =>
+    props.$disabled || props.$intensity <= 0 ? "none" : "block"};
+
+  /* Scanlines */
+  background: ${(props) =>
+    props.$intensity > 0
+      ? `
+    linear-gradient(
+      rgba(18, 16, 16, 0) 50%, 
+      rgba(0, 0, 0, ${0.25 * props.$intensity}) 50%
+    )
+  `
+      : "none"};
   background-size: 100% 4px;
-  z-index: 2;
-  
+
   &::before {
     content: "";
     position: absolute;
@@ -261,11 +249,11 @@ const CRTOverlay = styled.div`
     background: radial-gradient(
       circle at center,
       rgba(18, 16, 16, 0) 0%,
-      rgba(0, 0, 0, 0.1) 100%
+      rgba(0, 0, 0, ${(props) => 0.2 * (props.$intensity || 0)}) 100%
     );
     z-index: 2;
   }
-  
+
   &::after {
     content: "";
     position: absolute;
@@ -284,151 +272,59 @@ const CRTOverlay = styled.div`
 `;
 
 /**
- * Display Settings Component
+ * Display Settings Component with localized preview
  */
 const DisplaySettings = () => {
   const { settings, updateSettings } = useSettings();
-  const { 
-    applySpecificTheme, 
-    applyGenreTheme, 
+  const {
+    applySpecificTheme,
+    applyGenreTheme,
     forceThemeReapplication,
     currentTheme,
+    currentGenre,
     crtEffectLevel,
-    updateCrtEffectLevel
+    updateCrtEffectLevel,
+    theme: activeTheme, // Get the active theme object
   } = useThemeContext();
-  
+
   // Local state with original values for potential reset
   const [originalSettings, setOriginalSettings] = useState(settings.display);
   const [localSettings, setLocalSettings] = useState(settings.display);
-  
+
   // State for preview mode
   const [isPreviewActive, setIsPreviewActive] = useState(false);
-  
+
   // State to track unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // Use a ref to track the currently selected theme (helps with async updates)
+  const selectedThemeRef = useRef(localSettings.theme);
+  const selectedCrtLevelRef = useRef(localSettings.crtEffectLevel);
+
+  // Preview theme colors
+  const [previewColors, setPreviewColors] = useState({
+    desktop: "#008080",
+    window: "#c0c0c0",
+    windowHeader: "#000080",
+    text: "#000000",
+    textLight: "#ffffff",
+    crtEffectLevel: 0.5,
+  });
+
   // Define the available genre themes
   const genreThemes = ["fantasy", "scifi", "horror", "mystery", "western"];
-  
+
   // Update local state when settings change from context
   useEffect(() => {
     setLocalSettings(settings.display);
     setOriginalSettings(settings.display);
+    selectedThemeRef.current = settings.display.theme;
+    selectedCrtLevelRef.current = settings.display.crtEffectLevel;
     setHasUnsavedChanges(false);
-  }, [settings.display]);
 
-  // Handle checkbox change
-  const handleCheckboxChange = useCallback((e) => {
-    const { name, checked } = e.target;
-
-    setLocalSettings(prev => ({
-      ...prev,
-      [name]: checked
-    }));
-    
-    setHasUnsavedChanges(true);
-  }, []);
-
-  // Handle select change
-  const handleSelectChange = useCallback((e) => {
-    const { name, value } = e.target;
-
-    setLocalSettings(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    setHasUnsavedChanges(true);
-  }, []);
-
-  // Handle slider change
-  const handleSliderChange = useCallback((e) => {
-    const { name, value } = e.target;
-    const parsedValue = parseFloat(value);
-
-    setLocalSettings(prev => ({
-      ...prev,
-      [name]: parsedValue
-    }));
-    
-    setHasUnsavedChanges(true);
-    
-    // If in preview mode, apply CRT effect immediately
-    if (isPreviewActive && name === 'crtEffectLevel') {
-      updateCrtEffectLevel(parsedValue);
-    }
-  }, [isPreviewActive, updateCrtEffectLevel]);
-
-  // Apply theme based on the selected theme value
-  const applyTheme = useCallback((themeValue) => {
-    console.log(`Applying theme: ${themeValue}`);
-
-    // Handle specific themes - removed highContrast from here
-    if (themeValue === "win95") {
-      applySpecificTheme("win95");
-    }
-    // Handle genre themes
-    else if (genreThemes.includes(themeValue)) {
-      applyGenreTheme(themeValue);
-    } else {
-      // Default to win95 if theme is unknown
-      console.warn(`Unknown theme value: ${themeValue}, defaulting to win95`);
-      applySpecificTheme("win95");
-    }
-  }, [applySpecificTheme, applyGenreTheme, genreThemes]);
-
-  // Select a theme from the theme grid
-  const handleThemeSelect = useCallback((themeValue) => {
-    setLocalSettings(prev => ({
-      ...prev,
-      theme: themeValue
-    }));
-    
-    setHasUnsavedChanges(true);
-    
-    // If in preview mode, apply theme immediately
-    if (isPreviewActive) {
-      applyTheme(themeValue);
-    }
-  }, [applyTheme, isPreviewActive]);
-
-  // Apply settings to preview without saving
-  const handlePreview = useCallback(() => {
-    setIsPreviewActive(true);
-    
-    // Apply theme
-    applyTheme(localSettings.theme);
-    
-    // Apply CRT effect
-    updateCrtEffectLevel(localSettings.crtEffectLevel);
-    
-    // Force reapplication of theme to ensure all settings take effect
-    forceThemeReapplication();
-  }, [localSettings, applyTheme, updateCrtEffectLevel, forceThemeReapplication]);
-
-  // Save changes to context
-  const handleSave = useCallback(() => {
-    updateSettings("display", localSettings);
-    setIsPreviewActive(false);
-    setHasUnsavedChanges(false);
-    
-    // Apply theme and effects permanently
-    applyTheme(localSettings.theme);
-    updateCrtEffectLevel(localSettings.crtEffectLevel);
-    forceThemeReapplication();
-  }, [localSettings, updateSettings, applyTheme, updateCrtEffectLevel, forceThemeReapplication]);
-
-  // Reset to original settings
-  const handleCancel = useCallback(() => {
-    setLocalSettings(originalSettings);
-    setHasUnsavedChanges(false);
-    setIsPreviewActive(false);
-    
-    // Reapply original theme and effects
-    applyTheme(originalSettings.theme);
-    updateCrtEffectLevel(originalSettings.crtEffectLevel);
-    forceThemeReapplication();
-  }, [originalSettings, applyTheme, updateCrtEffectLevel, forceThemeReapplication]);
+    // Update preview colors based on active theme
+    updatePreviewColorsFromTheme(activeTheme);
+  }, [settings.display, activeTheme]);
 
   // Get color for a genre theme
   const getGenreColor = useCallback((genre) => {
@@ -444,15 +340,247 @@ const DisplaySettings = () => {
     return colors[genre] || "#c0c0c0";
   }, []);
 
-  // Available themes with name and color - removed highContrast
+  // Update preview colors based on a theme object
+  const updatePreviewColorsFromTheme = useCallback((theme) => {
+    setPreviewColors({
+      desktop: theme?.desktop || "#008080",
+      window: theme?.window || "#c0c0c0",
+      windowHeader: theme?.windowHeader || "#000080",
+      text: theme?.text || "#000000",
+      textLight: theme?.textLight || "#ffffff",
+      crtEffectLevel: theme?.crtEffectLevel || 0.5,
+    });
+  }, []);
+
+  // Get theme colors for a specific theme
+  const getThemeColors = useCallback((themeName) => {
+    // For Windows 95, return base theme
+    if (themeName === "win95") {
+      return {
+        desktop: "#008080",
+        window: "#c0c0c0",
+        windowHeader: "#000080",
+        text: "#000000",
+        textLight: "#ffffff",
+        crtEffectLevel: selectedCrtLevelRef.current,
+      };
+    }
+
+    // For genre themes
+    const genreThemeColors = {
+      fantasy: {
+        desktop: "#1a472a",
+        window: "#c0c0c0",
+        windowHeader: "#5d0000",
+        text: "#000000",
+        textLight: "#ffffff",
+        crtEffectLevel: selectedCrtLevelRef.current,
+      },
+      scifi: {
+        desktop: "#000435",
+        window: "#c0c0c0",
+        windowHeader: "#0c64c0",
+        text: "#000000",
+        textLight: "#ffffff",
+        crtEffectLevel: selectedCrtLevelRef.current,
+      },
+      horror: {
+        desktop: "#121212",
+        window: "#c0c0c0",
+        windowHeader: "#350000",
+        text: "#000000",
+        textLight: "#ffffff",
+        crtEffectLevel: selectedCrtLevelRef.current,
+      },
+      mystery: {
+        desktop: "#2f2c3d",
+        window: "#c0c0c0",
+        windowHeader: "#4b2b45",
+        text: "#000000",
+        textLight: "#ffffff",
+        crtEffectLevel: selectedCrtLevelRef.current,
+      },
+      western: {
+        desktop: "#8b5a2b",
+        window: "#c0c0c0",
+        windowHeader: "#542900",
+        text: "#000000",
+        textLight: "#ffffff",
+        crtEffectLevel: selectedCrtLevelRef.current,
+      },
+    };
+
+    return genreThemeColors[themeName] || genreThemeColors.win95;
+  }, []);
+
+  // Handle checkbox change
+  const handleCheckboxChange = useCallback((e) => {
+    const { name, checked } = e.target;
+
+    setLocalSettings((prev) => ({
+      ...prev,
+      [name]: checked,
+    }));
+
+    setHasUnsavedChanges(true);
+  }, []);
+
+  // Handle select change
+  const handleSelectChange = useCallback(
+    (e) => {
+      const { name, value } = e.target;
+
+      setLocalSettings((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+
+      // Store the selected theme in the ref for immediate access
+      if (name === "theme") {
+        selectedThemeRef.current = value;
+
+        // Update preview colors but don't apply to the app
+        const themeColors = getThemeColors(value);
+        setPreviewColors(themeColors);
+      }
+
+      setHasUnsavedChanges(true);
+    },
+    [getThemeColors]
+  );
+
+  // Handle slider change
+  const handleSliderChange = useCallback((e) => {
+    const { name, value } = e.target;
+    const parsedValue = parseFloat(value);
+
+    setLocalSettings((prev) => ({
+      ...prev,
+      [name]: parsedValue,
+    }));
+
+    // Store the selected CRT level in the ref for immediate access
+    if (name === "crtEffectLevel") {
+      selectedCrtLevelRef.current = parsedValue;
+
+      // Update the preview CRT effect level
+      setPreviewColors((prev) => ({
+        ...prev,
+        crtEffectLevel: parsedValue,
+      }));
+    }
+
+    setHasUnsavedChanges(true);
+  }, []);
+
+  // Select a theme from the theme grid (for preview only)
+  const handleThemeSelect = useCallback(
+    (themeValue) => {
+      // Update local state
+      setLocalSettings((prev) => ({
+        ...prev,
+        theme: themeValue,
+      }));
+
+      // Store the selected theme in the ref
+      selectedThemeRef.current = themeValue;
+
+      // Update preview colors but don't apply to app
+      const themeColors = getThemeColors(themeValue);
+      setPreviewColors(themeColors);
+
+      setHasUnsavedChanges(true);
+    },
+    [getThemeColors]
+  );
+
+  // Apply settings to preview box only - doesn't change app theme
+  const handlePreview = useCallback(() => {
+    setIsPreviewActive(true);
+
+    // Get colors for the selected theme
+    const themeColors = getThemeColors(selectedThemeRef.current);
+
+    // Update preview colors with current CRT level
+    setPreviewColors({
+      ...themeColors,
+      crtEffectLevel: selectedCrtLevelRef.current,
+    });
+  }, [getThemeColors]);
+
+  // Save changes and apply them to the app
+  const handleSave = useCallback(() => {
+    // Use the ref value to ensure we have the latest theme selection
+    const themeToApply = selectedThemeRef.current;
+    const crtLevelToApply = selectedCrtLevelRef.current;
+
+    // Save settings to context
+    updateSettings("display", {
+      ...localSettings,
+      theme: themeToApply,
+      crtEffectLevel: crtLevelToApply,
+    });
+
+    // Apply theme and effects permanently
+    if (themeToApply === "win95") {
+      applySpecificTheme("win95");
+    } else if (genreThemes.includes(themeToApply)) {
+      applyGenreTheme(themeToApply);
+    }
+
+    // Apply CRT effect level
+    updateCrtEffectLevel(crtLevelToApply);
+
+    // Force reapplication to ensure changes take effect
+    setTimeout(() => {
+      forceThemeReapplication();
+    }, 50);
+
+    setIsPreviewActive(false);
+    setHasUnsavedChanges(false);
+  }, [
+    localSettings,
+    updateSettings,
+    applySpecificTheme,
+    applyGenreTheme,
+    updateCrtEffectLevel,
+    forceThemeReapplication,
+    genreThemes,
+  ]);
+
+  // Reset to original settings
+  const handleCancel = useCallback(() => {
+    // Reset local state and refs
+    setLocalSettings(originalSettings);
+    selectedThemeRef.current = originalSettings.theme;
+    selectedCrtLevelRef.current = originalSettings.crtEffectLevel;
+
+    // Reset preview to current active theme
+    updatePreviewColorsFromTheme(activeTheme);
+
+    setHasUnsavedChanges(false);
+    setIsPreviewActive(false);
+  }, [originalSettings, activeTheme, updatePreviewColorsFromTheme]);
+
+  // Available themes with name and color
   const availableThemes = [
     { value: "win95", label: "Windows 95", color: getGenreColor("win95") },
-    ...genreThemes.map(genre => ({
+    ...genreThemes.map((genre) => ({
       value: genre,
       label: genre.charAt(0).toUpperCase() + genre.slice(1),
-      color: getGenreColor(genre)
-    }))
+      color: getGenreColor(genre),
+    })),
   ];
+
+  // Calculate the effective theme name for display
+  const effectiveTheme = isPreviewActive
+    ? selectedThemeRef.current
+    : currentTheme === "win95" && currentGenre
+    ? currentGenre
+    : currentTheme;
+
+  // Determine if CRT effect is disabled from accessibility settings
+  const isCrtDisabled = settings.accessibility.disableCrtEffect;
 
   return (
     <div>
@@ -469,7 +597,7 @@ const DisplaySettings = () => {
           value={localSettings.theme}
           onChange={handleSelectChange}
         >
-          {availableThemes.map(theme => (
+          {availableThemes.map((theme) => (
             <option key={theme.value} value={theme.value}>
               {theme.label}
             </option>
@@ -481,7 +609,7 @@ const DisplaySettings = () => {
         </HelperText>
 
         <ThemePreviewGrid>
-          {availableThemes.map(theme => (
+          {availableThemes.map((theme) => (
             <ThemePreviewItem
               key={theme.value}
               $color={theme.color}
@@ -492,9 +620,7 @@ const DisplaySettings = () => {
               <Text
                 size="10px"
                 color={
-                  ["horror", "scifi"].includes(theme.value)
-                    ? "white"
-                    : "black"
+                  ["horror", "scifi"].includes(theme.value) ? "white" : "black"
                 }
                 bold
               >
@@ -524,14 +650,14 @@ const DisplaySettings = () => {
               step="0.1"
               value={localSettings.crtEffectLevel}
               onChange={handleSliderChange}
-              disabled={settings.accessibility.disableCrtEffect}
+              disabled={isCrtDisabled}
             />
             <SliderValue>
               {Math.round(localSettings.crtEffectLevel * 100)}%
             </SliderValue>
           </SliderRow>
           <HelperText>
-            {settings.accessibility.disableCrtEffect
+            {isCrtDisabled
               ? "CRT effect is disabled in Accessibility settings"
               : "Adjust the intensity of the CRT screen effect"}
           </HelperText>
@@ -557,64 +683,85 @@ const DisplaySettings = () => {
         </OptionContainer>
       </SettingsSection>
 
-      {/* Preview section */}
+      {/* Preview section - enhanced with local styling */}
       <SettingsSection>
         <SectionTitle>Preview</SectionTitle>
-        
+
         <PreviewSection>
-          <PreviewTitle>Current Theme Preview</PreviewTitle>
-          
-          <PreviewWindow>
-            {/* Using ThemePreviewHeader instead of PreviewHeader here */}
-            <ThemePreviewHeader>
-              <img 
-                src={placeholderIcons.windows} 
-                alt="Window" 
-                style={{ width: "16px", height: "16px", marginRight: "5px" }} 
+          <PreviewTitle>Theme Preview</PreviewTitle>
+
+          {/* Desktop background preview with inline styles */}
+          <DesktopPreview
+            $bgColor={isPreviewActive ? previewColors.desktop : undefined}
+          >
+            <Text color="white" bold textShadow="1px 1px 2px rgba(0,0,0,0.7)">
+              Desktop Background
+            </Text>
+          </DesktopPreview>
+
+          {/* Window preview with inline styles */}
+          <PreviewWindow
+            $bgColor={isPreviewActive ? previewColors.window : undefined}
+          >
+            <ThemePreviewHeader
+              $bgColor={
+                isPreviewActive ? previewColors.windowHeader : undefined
+              }
+            >
+              <img
+                src={placeholderIcons.windows}
+                alt="Window"
+                style={{ width: "16px", height: "16px", marginRight: "5px" }}
               />
               Sample Window
             </ThemePreviewHeader>
-            {/* Using ThemePreviewContent instead of PreviewContent here */}
-            <ThemePreviewContent>
-              <Text>This is how your windows will appear with the selected theme.</Text>
-              <Text>Try adjusting the CRT effect to see how it changes the appearance.</Text>
-              
-              {/* CRT Effect layer */}
-              {!settings.accessibility.disableCrtEffect && (
-                <CRTOverlay $intensity={isPreviewActive ? localSettings.crtEffectLevel : crtEffectLevel} />
-              )}
+
+            <ThemePreviewContent
+              $bgColor={isPreviewActive ? previewColors.window : undefined}
+              $textColor={isPreviewActive ? previewColors.text : undefined}
+            >
+              <Text>
+                This is how your windows will appear with the selected theme.
+              </Text>
+              <Text>
+                Try adjusting the CRT effect to see how it changes the
+                appearance.
+              </Text>
+
+              {/* CRT Effect layer with inline styling */}
+              <CRTOverlay
+                $intensity={
+                  isPreviewActive
+                    ? previewColors.crtEffectLevel
+                    : crtEffectLevel
+                }
+                $disabled={isCrtDisabled}
+              />
             </ThemePreviewContent>
           </PreviewWindow>
-          
+
           <Text size="11px" color="#666">
-            Theme: {isPreviewActive ? localSettings.theme : currentTheme}
+            Theme: {isPreviewActive ? selectedThemeRef.current : effectiveTheme}
             {" | "}
-            CRT Effect: {isPreviewActive ? 
-              `${Math.round(localSettings.crtEffectLevel * 100)}%` : 
-              `${Math.round(crtEffectLevel * 100)}%`}
+            CRT Effect:{" "}
+            {isCrtDisabled
+              ? "Disabled"
+              : isPreviewActive
+              ? `${Math.round(previewColors.crtEffectLevel * 100)}%`
+              : `${Math.round(crtEffectLevel * 100)}%`}
           </Text>
         </PreviewSection>
-        
+
         <ActionButtons>
-          <PreviewButton 
-            onClick={handlePreview}
-            disabled={!hasUnsavedChanges}
-          >
+          {/* <PreviewButton onClick={handlePreview} disabled={!hasUnsavedChanges}>
             Preview Changes
-          </PreviewButton>
-          
-          <Button 
-            onClick={handleSave}
-            primary
-            disabled={!hasUnsavedChanges}
-          >
+          </PreviewButton> */}
+
+          <Button onClick={handleSave} primary disabled={!hasUnsavedChanges}>
             Save Changes
           </Button>
-          
-          <Button 
-            onClick={handleCancel}
-            disabled={!hasUnsavedChanges}
-          >
+
+          <Button onClick={handleCancel} disabled={!hasUnsavedChanges}>
             Cancel
           </Button>
         </ActionButtons>
