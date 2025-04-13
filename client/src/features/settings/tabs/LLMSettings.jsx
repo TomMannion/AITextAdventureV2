@@ -6,6 +6,7 @@ import Text from "../../../components/common/Text";
 import Button from "../../../components/common/Button";
 import { useSettings } from "../../../contexts/SettingsContext";
 import modelService from "../../../services/modelService";
+import { authService } from "../../../services/auth.service";
 
 // Styled components
 const SettingsSection = styled.div`
@@ -146,11 +147,43 @@ const LLMSettings = () => {
   const [models, setModels] = useState([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelError, setModelError] = useState(null);
+  
+  // Track if we've already saved these settings to prevent duplicates
+  const [lastSavedSettings, setLastSavedSettings] = useState({
+    provider: settings.llm.provider,
+    model: settings.llm.model
+  });
 
   // Update local state when settings change
   useEffect(() => {
     setLocalSettings(settings.llm);
   }, [settings.llm]);
+
+  // Save settings to database - utility function
+  const saveSettingsToDatabase = useCallback(async (provider, model) => {
+    try {
+      // Prepare the data to send to the server
+      const preferencesData = {
+        preferredProvider: provider,
+        preferredModel: model
+      };
+
+      // Call the API to update user preferences
+      await authService.updatePreferences(preferencesData);
+      console.log("Settings saved to database");
+      
+      // Update our saved reference
+      setLastSavedSettings({
+        provider,
+        model
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Error saving preferences to database:", error);
+      return false;
+    }
+  }, []);
 
   // Fetch models from provider
   const fetchModels = useCallback(async (provider, apiKey) => {
@@ -212,14 +245,34 @@ const LLMSettings = () => {
     });
   }, []);
 
-  // Use debounced effect for saving changes
+  // Use debounced effect for saving changes to local context
   useEffect(() => {
     const timer = setTimeout(() => {
+      // Update local settings context
       updateSettings("llm", localSettings);
-    }, 300); // 300ms debounce
+    }, 500); // 500ms debounce
 
     return () => clearTimeout(timer);
   }, [localSettings, updateSettings]);
+
+  // Separate effect for database updates with longer debounce
+  useEffect(() => {
+    // Only proceed if we have valid settings and they've actually changed
+    if (!localSettings.provider || !localSettings.model) return;
+    
+    // Check if these exact settings are already saved
+    if (localSettings.provider === lastSavedSettings.provider && 
+        localSettings.model === lastSavedSettings.model) {
+      return; // Skip if nothing changed
+    }
+    
+    // Use a longer debounce for API calls
+    const saveTimer = setTimeout(async () => {
+      await saveSettingsToDatabase(localSettings.provider, localSettings.model);
+    }, 2000); // Longer 2-second debounce for API calls
+    
+    return () => clearTimeout(saveTimer);
+  }, [localSettings.provider, localSettings.model, lastSavedSettings, saveSettingsToDatabase]);
 
   // Test API key
   const handleTestApiKey = useCallback(async () => {
@@ -237,11 +290,16 @@ const LLMSettings = () => {
       await modelService.getProviderModels(localSettings.provider, localSettings.apiKey);
       setTestStatus("success");
       setTestMessage("Connection successful! API key is valid.");
+      
+      // If API key test is successful and we have a model selected, save settings to database
+      if (localSettings.model) {
+        await saveSettingsToDatabase(localSettings.provider, localSettings.model);
+      }
     } catch (error) {
       setTestStatus("error");
       setTestMessage(error.message || "Failed to connect with this API key");
     }
-  }, [localSettings.provider, localSettings.apiKey]);
+  }, [localSettings.provider, localSettings.apiKey, localSettings.model, saveSettingsToDatabase]);
 
   // Refresh models
   const handleRefreshModels = useCallback(() => {

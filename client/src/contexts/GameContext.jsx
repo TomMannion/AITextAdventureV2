@@ -182,10 +182,6 @@ export const GameProvider = ({ children }) => {
     (error) => {
       if (error) {
         console.error("Game error:", error);
-        // Show error notification for user-friendly errors
-        if (typeof error === "string" && !error.includes("API key")) {
-          showError(error, { timeout: 5000 });
-        }
       }
       dispatch({ type: ACTIONS.SET_ERROR, payload: error });
     },
@@ -322,16 +318,6 @@ export const GameProvider = ({ children }) => {
           // Clear fetching flag
           fetchingGamesRef.current = false;
 
-          // Show info notification if we have games
-          if (games && games.length > 0) {
-            showInfo(
-              `Found ${games.length} adventure${games.length !== 1 ? "s" : ""}`,
-              {
-                timeout: 3000,
-                title: "Games Loaded",
-              }
-            );
-          }
         }, 300);
 
         return games;
@@ -360,7 +346,6 @@ export const GameProvider = ({ children }) => {
       setError,
       setGameList,
       setGamesInitialized,
-      showInfo,
     ]
   );
 
@@ -421,11 +406,6 @@ export const GameProvider = ({ children }) => {
             type: "system",
           });
 
-          // Show notification
-          showInfo(`Your ${newGame.genre} adventure awaits!`, {
-            title: "Adventure Created",
-            timeout: 3000,
-          });
         }, 300);
 
         return newGame;
@@ -449,7 +429,6 @@ export const GameProvider = ({ children }) => {
       setCurrentGame,
       resetGameState,
       addLog,
-      showInfo,
     ]
   );
 
@@ -525,11 +504,6 @@ export const GameProvider = ({ children }) => {
             type: "system",
           });
 
-          // Show notification
-          showInfo(`Continuing your ${game.genre} adventure!`, {
-            title: "Adventure Loaded",
-            timeout: 3000,
-          });
         }, 300);
 
         return game;
@@ -555,7 +529,6 @@ export const GameProvider = ({ children }) => {
       setCurrentSegment,
       setOptions,
       addLog,
-      showInfo,
     ]
   );
 
@@ -661,11 +634,7 @@ export const GameProvider = ({ children }) => {
 
         setStatus("playing");
 
-        // Show notification
-        showInfo("Your adventure begins!", {
-          title: "Story Started",
-          timeout: 3000,
-        });
+      
 
         return response;
       } catch (error) {
@@ -697,7 +666,6 @@ export const GameProvider = ({ children }) => {
       setSegments,
       setOptions,
       addLog,
-      showInfo,
     ]
   );
 
@@ -840,10 +808,6 @@ export const GameProvider = ({ children }) => {
             type: "system",
           });
 
-          showInfo("Game progress saved", {
-            title: "Save Complete",
-            timeout: 2000,
-          });
 
           return true;
         } catch (saveError) {
@@ -856,7 +820,7 @@ export const GameProvider = ({ children }) => {
         return false;
       }
     },
-    [state.currentGame, setError, addLog, showInfo]
+    [state.currentGame, setError, addLog]
   );
 
   // Context value

@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { useGameFlow } from '../../contexts/GameFlowContext';
-import { useGameData } from '../../contexts/GameDataContext';
+import { useGameStore } from '../../../../contexts/GameStoreContext';
 import GameControls from './GameControls';
 import StoryPane from './StoryPane';
 import ChoiceSelector from './ChoiceSelector';
+import GameKeyboardShortcuts from './GameKeyboardShortcuts';
 import GameMetadata from './GameMetadata';
 
 const PlayerContainer = styled.div`
@@ -43,10 +44,12 @@ const StatusBar = styled.div`
   font-size: 12px;
   background-color: var(--win95-window-bg);
   color: #666;
+  display: flex;
+  justify-content: space-between;
 `;
 
 /**
- * Game player component - main gameplay interface
+ * Improved game player component - main gameplay interface with better readability and navigation
  */
 const GamePlayer = () => {
   const { goToLauncher, goToCompleted } = useGameFlow();
@@ -61,10 +64,22 @@ const GamePlayer = () => {
     saveGame,
     setSelectedOption,
     setCustomOption
-  } = useGameData();
+  } = useGameStore();
   
   // Status message
   const [statusMessage, setStatusMessage] = useState('Ready for your next action');
+  
+  // Keep track of player choices to display alongside story segments
+  const [playerChoices, setPlayerChoices] = useState([]);
+  
+  // Reference to story pane for scrolling
+  const scrollRef = useRef(null);
+  
+  // Last save time for status bar
+  const [lastSaveTime, setLastSaveTime] = useState(null);
+  
+  // Track current segment/turn for navigation
+  const [currentTurn, setCurrentTurn] = useState(0);
   
   // Handle game exit
   const handleExit = () => {
@@ -75,18 +90,67 @@ const GamePlayer = () => {
   const handleSave = async () => {
     setStatusMessage('Saving game...');
     const success = await saveGame();
-    setStatusMessage(success ? 'Game saved successfully' : 'Failed to save game');
+    
+    if (success) {
+      const now = new Date();
+      setLastSaveTime(now);
+      setStatusMessage('Game saved successfully');
+    } else {
+      setStatusMessage('Failed to save game');
+    }
+  };
+  
+  // Handle jumping to a specific turn
+  const handleJumpToTurn = (turnIndex) => {
+    // Convert from 1-based (UI) to 0-based (actual index)
+    const index = turnIndex - 1;
+    
+    // Validate index
+    if (index >= 0 && index < segments.length) {
+      setCurrentTurn(index);
+      
+      // Scroll to the segment
+      if (scrollRef.current) {
+        const segmentElements = scrollRef.current.querySelectorAll('[data-segment-id]');
+        if (segmentElements[index]) {
+          segmentElements[index].scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    }
+  };
+  
+  // Format save time for display
+  const formatSaveTime = (date) => {
+    if (!date) return '';
+    
+    return date.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      second: '2-digit'
+    });
   };
   
   // Handle choice submission
   const handleSubmitChoice = async () => {
-    if (!selectedOption && !customOption.trim()) {
-      setStatusMessage('Please select an option or enter your own action');
+    if (!selectedOption) {
+      setStatusMessage('Please select an option to continue');
       return;
     }
     
     setStatusMessage('Processing your choice...');
-    const result = await submitChoice(selectedOption, customOption);
+    
+    // Determine the choice text to display
+    let choiceText = '';
+    
+    // Find the selected option text
+    const selectedOptionObj = options.find(opt => opt.id === selectedOption);
+    choiceText = selectedOptionObj?.text || 'Selected option';
+    
+    // Save the choice for display purposes
+    setPlayerChoices(prev => [...prev, choiceText]);
+    
+    // Submit the choice to the backend
+    const result = await submitChoice(selectedOption, null);
     
     if (result) {
       setStatusMessage('What will you do next?');
@@ -103,14 +167,26 @@ const GamePlayer = () => {
     }
   };
   
-  // Keep scroll at bottom when new content arrives
-  const scrollRef = useRef(null);
-  
+  // When segments change, ensure we have matching player choices
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    // If we have more segments than player choices, pad with empty choices
+    // This might happen when loading a saved game
+    if (segments.length > playerChoices.length + 1) {
+      const newChoices = [...playerChoices];
+      
+      // Add placeholder choices (minus 1 for the first segment which has no choice)
+      while (newChoices.length < segments.length - 1) {
+        newChoices.push('...');
+      }
+      
+      setPlayerChoices(newChoices);
     }
-  }, [currentSegment]);
+    
+    // Update current turn to the latest when segments change
+    if (segments.length > 0) {
+      setCurrentTurn(segments.length - 1);
+    }
+  }, [segments, playerChoices]);
   
   return (
     <PlayerContainer>
@@ -123,26 +199,42 @@ const GamePlayer = () => {
       <MainContent>
         <LeftPanel>
           <StoryPane 
-            segments={segments} 
+            segments={segments}
+            playerChoices={playerChoices}
             scrollRef={scrollRef}
+            currentTurn={currentTurn}
           />
           
           <ChoiceSelector
             options={options}
             selectedOption={selectedOption}
-            customOption={customOption}
             onSelectOption={setSelectedOption}
-            onCustomOptionChange={setCustomOption}
             onSubmit={handleSubmitChoice}
           />
         </LeftPanel>
         
         <RightPanel>
-          <GameMetadata game={currentGame} />
+          <GameMetadata 
+            game={currentGame}
+            currentTurn={currentTurn}
+            onJumpToTurn={handleJumpToTurn}
+          />
         </RightPanel>
       </MainContent>
       
-      <StatusBar>{statusMessage}</StatusBar>
+      <StatusBar>
+        <div>{statusMessage}</div>
+        {lastSaveTime && (
+          <div>Last saved: {formatSaveTime(lastSaveTime)}</div>
+        )}
+      </StatusBar>
+      
+      {/* Keyboard shortcuts component */}
+      <GameKeyboardShortcuts
+        onSave={handleSave}
+        onSubmit={handleSubmitChoice}
+        isSubmitEnabled={!!selectedOption}
+      />
     </PlayerContainer>
   );
 };

@@ -1,6 +1,6 @@
+// src/features/game-engine/GameModule.jsx - Updated with GameStoreContext
 import React, { useEffect } from 'react';
-import { GameFlowProvider, useGameFlow, FLOW_STATES } from './contexts/GameFlowContext';
-import { GameDataProvider, useGameData } from './contexts/GameDataContext';
+import { useGameStore, FLOW_STATES } from '../../contexts/GameStoreContext';
 import { useThemeContext } from '../../contexts/ThemeContext';
 
 // Import components
@@ -16,12 +16,19 @@ import LoadingScreen from './components/shared/LoadingScreen';
  * Game content renderer - displays the appropriate screen based on flow state
  */
 const GameContent = () => {
-  const { flowState, error } = useGameFlow();
-  const { isLoading, loadingMessage, progress, currentGame } = useGameData();
+  // Use the consolidated GameStoreContext
+  const { 
+    flowState, 
+    error, 
+    isLoading, 
+    loadingMessage, 
+    progress, 
+    currentGame,
+    fetchGames, 
+    initialized 
+  } = useGameStore();
   
   // Initialize games when component mounts
-  const { fetchGames, initialized } = useGameData();
-  
   useEffect(() => {
     if (!initialized) {
       fetchGames().catch(console.error);
@@ -59,16 +66,11 @@ const GameContent = () => {
 };
 
 /**
- * Main Game Module component with providers
+ * Main Game Module component
+ * The wrapping providers have been moved to App.jsx
  */
 const GameModule = () => {
-  return (
-    <GameFlowProvider>
-      <GameDataProvider>
-        <GameContent />
-      </GameDataProvider>
-    </GameFlowProvider>
-  );
+  return <GameContent />;
 };
 
 export default GameModule;

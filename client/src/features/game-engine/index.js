@@ -1,7 +1,6 @@
-// Entry point for the game engine feature
+// src/features/game-engine/index.js - Updated to use GameStoreContext
 import GameModule from './GameModule';
-import { GameFlowProvider, useGameFlow, FLOW_STATES } from './contexts/GameFlowContext';
-import { GameDataProvider, useGameData } from './contexts/GameDataContext';
+import { FLOW_STATES, useGameStore } from '../../contexts/GameStoreContext';
 
 // Window registration
 import registerGameWindows from './registerGameWindows';
@@ -11,19 +10,20 @@ export {
   // Main module
   GameModule,
   
-  // Providers
-  GameFlowProvider,
-  GameDataProvider,
-  
   // Hooks
-  useGameFlow,
-  useGameData,
+  useGameStore,
   
   // Constants
   FLOW_STATES,
   
   // Window registration
   registerGameWindows,
+};
+
+// Legacy exports for backward compatibility
+export { 
+  useGameStore as useGameFlow,
+  useGameStore as useGameData,
 };
 
 // Default export for convenient importing

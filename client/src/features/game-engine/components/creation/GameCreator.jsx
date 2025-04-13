@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { useGameFlow } from '../../contexts/GameFlowContext';
-import { useGameData } from '../../contexts/GameDataContext';
+import { useGameStore } from '../../../../contexts/GameStoreContext';
 import { useSettings } from '../../../../contexts/SettingsContext';
 import Button from '../../../../components/common/Button';
 import { win95Border } from '../../../../utils/styleUtils';
@@ -100,8 +99,17 @@ const ErrorMessage = styled.div`
  * Game creator component - for creating new adventures
  */
 const GameCreator = () => {
-  const { goToLauncher, goToPlayer } = useGameFlow();
-  const { createGame, updateApiKey, apiKey, toggleSaveApiKey, saveApiKey, startGame } = useGameData();
+  const { 
+    goToLauncher, 
+    goToPlayer, 
+    createGame, 
+    updateApiKey, 
+    apiKey, 
+    toggleSaveApiKey, 
+    saveApiKey, 
+    startGame 
+  } = useGameStore();
+  
   const { settings } = useSettings();
   
   // Form state
@@ -180,8 +188,7 @@ const GameCreator = () => {
         // Start the game to generate initial content
         await startGame(newGame.id);
         
-        // Navigate to player
-        goToPlayer();
+        // Navigate to player happens inside startGame in our consolidated context
       }
     } catch (err) {
       setError(err.message || 'Failed to create game');

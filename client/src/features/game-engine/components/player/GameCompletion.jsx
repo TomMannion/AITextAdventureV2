@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import styled from 'styled-components';
-import { useGameFlow } from '../../contexts/GameFlowContext';
-import { useGameData } from '../../contexts/GameDataContext';
+import { useGameStore } from '../../../../contexts/GameStoreContext';
 import { win95Border } from '../../../../utils/styleUtils';
 import { getGenreIcon } from '../../../../utils/iconUtils';
 import useGameNotifications from '../../../../hooks/useGameNotifications';
@@ -105,7 +104,7 @@ const ButtonContainer = styled.div`
  * @param {Object} props.game Game data
  */
 const GameCompletion = ({ game }) => {
-  const { goToLauncher, goToCreator } = useGameFlow();
+  const { goToLauncher, goToCreator } = useGameStore();
   const { showGameCompletionNotification } = useGameNotifications();
   
   // Show completion notification when component mounts

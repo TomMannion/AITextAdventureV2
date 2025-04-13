@@ -2,6 +2,8 @@ import React from 'react';
 import styled from 'styled-components';
 import { win95Border } from '../../../../utils/styleUtils';
 import Button from '../../../../components/common/Button';
+import { placeholderIcons } from '../../../../utils/iconUtils';
+import { useGameStore } from '../../../../contexts/GameStoreContext';
 
 const SelectorContainer = styled.div`
   border-top: 1px solid var(--win95-border-darker);
@@ -9,79 +11,87 @@ const SelectorContainer = styled.div`
   padding: 10px;
 `;
 
+const SelectorHeader = styled.div`
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: bold;
+  font-size: 12px;
+  color: var(--win95-window-header);
+`;
+
+const HeaderIcon = styled.img`
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+`;
+
 const OptionsContainer = styled.div`
+  ${win95Border('inset')}
+  background-color: white;
+  padding: 5px;
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+`;
+
+const OptionsList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  margin-bottom: 15px;
+  gap: 4px;
 `;
 
 const OptionButton = styled.button`
   text-align: left;
   padding: 8px 10px;
   ${props => props.$selected ? win95Border('inset') : win95Border('outset')}
-  background-color: ${props => props.$selected ? '#e0e0e0' : 'white'};
+  background-color: ${props => props.$selected ? '#e0e0ff' : '#f0f0f0'};
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #000080;
+  position: relative;
+  padding-left: ${props => props.$hasBullet ? '24px' : '10px'};
   
   &:hover {
-    background-color: ${props => props.$selected ? '#e0e0e0' : '#f0f7ff'};
+    background-color: ${props => props.$selected ? '#e0e0ff' : '#f0f7ff'};
+  }
+  
+  &:before {
+    content: ${props => props.$hasBullet ? '"•"' : '""'};
+    position: ${props => props.$hasBullet ? 'absolute' : 'static'};
+    left: ${props => props.$hasBullet ? '10px' : '0'};
+    color: #000080;
+    font-weight: bold;
   }
 `;
 
-const CustomInputContainer = styled.div`
-  margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px dashed var(--win95-border-darker);
-`;
-
-const CustomInputLabel = styled.div`
-  font-size: 12px;
-  margin-bottom: 5px;
-`;
-
-const CustomInput = styled.input`
-  width: 100%;
-  padding: 8px;
-  margin-bottom: 8px;
-  ${win95Border('inset')}
-  background-color: white;
-  font-size: 12px;
-  font-family: 'ms_sans_serif', sans-serif;
-`;
-
-const SubmitButton = styled(Button)`
-  margin-top: 5px;
-  width: 100%;
-`;
-
 const EmptyOptionsMessage = styled.div`
-  ${win95Border('inset')}
   padding: 10px;
-  background-color: white;
-  font-size: 12px;
   color: #808080;
   text-align: center;
-  margin-bottom: 15px;
+  font-size: 12px;
+`;
+
+const ButtonContainer = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
 `;
 
 /**
- * Choice selector component - displays available options and custom input
+ * Improved choice selector component - displays available options
  * 
  * @param {Object} props Component props
  * @param {Array} props.options Available options
  * @param {string|number} props.selectedOption Selected option ID
- * @param {string} props.customOption Custom option text
  * @param {Function} props.onSelectOption Handler for option selection
- * @param {Function} props.onCustomOptionChange Handler for custom option changes
  * @param {Function} props.onSubmit Handler for submit button
  */
 const ChoiceSelector = ({
   options = [],
   selectedOption,
-  customOption = '',
   onSelectOption,
-  onCustomOptionChange,
   onSubmit,
 }) => {
   // Handle option click
@@ -89,51 +99,53 @@ const ChoiceSelector = ({
     onSelectOption(optionId);
   };
   
-  // Handle custom input change
-  const handleCustomInputChange = (e) => {
-    onCustomOptionChange(e.target.value);
-  };
-  
   // Check if submit is enabled
-  const isSubmitEnabled = selectedOption || customOption.trim().length > 0;
+  const isSubmitEnabled = !!selectedOption;
   
   return (
     <SelectorContainer>
-      {options.length === 0 ? (
-        <EmptyOptionsMessage>
-          Waiting for options to appear...
-        </EmptyOptionsMessage>
+      <SelectorHeader>
+        <HeaderIcon src={placeholderIcons.adventure} alt="" />
+        What would you like to do?
+      </SelectorHeader>
+      
+      {options.length > 0 ? (
+        <OptionsContainer>
+          <OptionsList>
+            {options.map(option => (
+              <OptionButton
+                key={option.id}
+                $selected={selectedOption === option.id}
+                $hasBullet={true}
+                onClick={() => handleOptionClick(option.id)}
+              >
+                {option.text}
+              </OptionButton>
+            ))}
+          </OptionsList>
+        </OptionsContainer>
       ) : (
         <OptionsContainer>
-          {options.map(option => (
-            <OptionButton
-              key={option.id}
-              $selected={selectedOption === option.id}
-              onClick={() => handleOptionClick(option.id)}
-            >
-              {option.text}
-            </OptionButton>
-          ))}
+          <EmptyOptionsMessage>
+            Waiting for options to appear...
+          </EmptyOptionsMessage>
         </OptionsContainer>
       )}
       
-      <CustomInputContainer>
-        <CustomInputLabel>Or enter your own action:</CustomInputLabel>
-        <CustomInput
-          type="text"
-          value={customOption}
-          onChange={handleCustomInputChange}
-          placeholder="Type what you want to do..."
-        />
-        
-        <SubmitButton 
+      <ButtonContainer>
+        <Button 
           primary
           onClick={onSubmit}
           disabled={!isSubmitEnabled}
         >
-          Continue
-        </SubmitButton>
-      </CustomInputContainer>
+          <img 
+            src={placeholderIcons.adventure}
+            alt=""
+            style={{ width: '14px', height: '14px', marginRight: '5px' }}
+          />
+          Continue Adventure
+        </Button>
+      </ButtonContainer>
     </SelectorContainer>
   );
 };

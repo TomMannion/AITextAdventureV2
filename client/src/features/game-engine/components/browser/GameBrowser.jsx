@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { useGameFlow } from '../../contexts/GameFlowContext';
-import { useGameData } from '../../contexts/GameDataContext';
+import { useGameStore } from '../../../../contexts/GameStoreContext';
 import Button from '../../../../components/common/Button';
 import { win95Border } from '../../../../utils/styleUtils';
 import { placeholderIcons } from '../../../../utils/iconUtils';
@@ -73,8 +72,16 @@ const ButtonContainer = styled.div`
  * Game browser component - displays list of saved games
  */
 const GameBrowser = () => {
-  const { goToLauncher, goToCreator, goToPlayer } = useGameFlow();
-  const { gameList, fetchGames, loadGame, startGame, apiKey } = useGameData();
+  const { 
+    goToLauncher, 
+    goToCreator, 
+    goToPlayer, 
+    gameList, 
+    fetchGames, 
+    loadGame, 
+    startGame, 
+    apiKey 
+  } = useGameStore();
   
   // Filter state
   const [filters, setFilters] = useState({

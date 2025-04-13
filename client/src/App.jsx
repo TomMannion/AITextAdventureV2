@@ -1,4 +1,4 @@
-// src/App.jsx - Updated with SettingsProvider
+// src/App.jsx - Updated with GameStoreProvider
 import React from "react";
 import {
   BrowserRouter as Router,
@@ -8,18 +8,18 @@ import {
 } from "react-router-dom";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { WindowProvider } from "./contexts/WindowContext";
-import { GameProvider } from "./contexts/GameContext";
+import { GameStoreProvider } from "./contexts/GameStoreContext"; // Updated import
 import { AuthProvider } from "./contexts/AuthContext";
 import { AudioProvider } from "./contexts/AudioContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
-import { SettingsProvider } from "./contexts/SettingsContext"; // Add SettingsProvider
+import { SettingsProvider } from "./contexts/SettingsContext";
 
 import NotificationContainer from "./components/notifications/NotificationContainer";
 import DesktopContent from "./features/desktop/Desktop";
 import LoginForm from "./features/auth/components/LoginForm";
 import RegisterForm from "./features/auth/components/RegisterForm";
 import ProtectedRoute from "./components/common/ProtectedRoute";
-import SettingsModule from "./features/settings/SettingsModule"; // Add SettingsModule
+import SettingsModule from "./features/settings/SettingsModule";
 
 // App component using React Router
 const App = () => {
@@ -30,9 +30,7 @@ const App = () => {
           <WindowProvider>
             <AuthProvider>
               <SettingsProvider>
-                {" "}
-                {/* Add SettingsProvider */}
-                <GameProvider>
+                <GameStoreProvider> {/* Updated provider */}
                   {/* Global notification container */}
                   <NotificationContainer />
 
@@ -66,7 +64,7 @@ const App = () => {
                       />
                     </Routes>
                   </Router>
-                </GameProvider>
+                </GameStoreProvider>
               </SettingsProvider>
             </AuthProvider>
           </WindowProvider>

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
-// Game flow states
+// Game flow states - define them here, not imported from GameStoreContext
 export const FLOW_STATES = {
   LAUNCHER: 'launcher',   // Main menu
   CREATOR: 'creator',     // Create new game

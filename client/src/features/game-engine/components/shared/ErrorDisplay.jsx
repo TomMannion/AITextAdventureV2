@@ -2,7 +2,7 @@ import React from 'react';
 import styled from 'styled-components';
 import { win95Border } from '../../../../utils/styleUtils';
 import Button from '../../../../components/common/Button';
-import { useGameFlow } from '../../contexts/GameFlowContext';
+import { useGameStore } from '../../../../contexts/GameStoreContext';
 
 const ErrorContainer = styled.div`
   display: flex;
@@ -67,7 +67,7 @@ const ErrorDisplay = ({
   message = 'An unexpected error occurred',
   title = 'Error'
 }) => {
-  const { goToLauncher, clearError } = useGameFlow();
+  const { goToLauncher, clearError } = useGameStore();
   
   const handleRetry = () => {
     clearError();

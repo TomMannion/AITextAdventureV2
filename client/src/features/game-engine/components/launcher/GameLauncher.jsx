@@ -1,7 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
-import { useGameFlow } from '../../contexts/GameFlowContext';
-import { useGameData } from '../../contexts/GameDataContext';
+import { useGameStore } from '../../../../contexts/GameStoreContext';
 import GameMenuCard from './GameMenuCard';
 import { placeholderIcons } from '../../../../utils/iconUtils';
 
@@ -54,8 +53,7 @@ const Footer = styled.div`
  * Game launcher component - main menu for the game engine
  */
 const GameLauncher = () => {
-  const { goToCreator, goToBrowser } = useGameFlow();
-  const { gameList, fetchGames } = useGameData();
+  const { goToCreator, goToBrowser, gameList, fetchGames } = useGameStore();
   
   const handleNewGame = () => {
     goToCreator();

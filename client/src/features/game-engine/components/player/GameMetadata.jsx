@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { win95Border } from '../../../../utils/styleUtils';
 import { getGenreIcon } from '../../../../utils/iconUtils';
 import { formatDate } from '../../../../utils/dateUtils';
+import StoryNavigator from './StoryNavigator';
 
 const MetadataContainer = styled.div`
   display: flex;
@@ -117,12 +118,18 @@ const LogMessage = styled.span`
 `;
 
 /**
- * Game metadata component - displays game information and logs
+ * Improved game metadata component - displays game information and logs
  * 
  * @param {Object} props Component props
  * @param {Object} props.game Game data
+ * @param {Function} props.onJumpToTurn Handler for jumping to a specific turn
+ * @param {number} props.currentTurn Current turn/segment index
  */
-const GameMetadata = ({ game }) => {
+const GameMetadata = ({ 
+  game,
+  onJumpToTurn,
+  currentTurn = 0
+}) => {
   if (!game) {
     return (
       <MetadataContainer>
@@ -199,8 +206,22 @@ const GameMetadata = ({ game }) => {
   // Log entries
   const logEntries = getLogEntries();
   
+  // Calculate the current turn index (1-based)
+  const displayTurn = currentTurn + 1;
+  const totalTurns = game.storySegments?.length || 1;
+  
   return (
     <MetadataContainer>
+      {/* Story Navigator Section */}
+      {/* <Section>
+        <SectionHeader>Navigation</SectionHeader>
+        <StoryNavigator
+          currentTurn={displayTurn}
+          totalTurns={totalTurns}
+          onJumpToTurn={onJumpToTurn}
+        />
+      </Section> */}
+      
       <GameInfoSection>
         <SectionHeader>Game Info</SectionHeader>
         <SectionContent>
