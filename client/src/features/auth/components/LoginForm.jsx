@@ -6,6 +6,8 @@ import Button from "../../../components/common/Button";
 import Text from "../../../components/common/Text";
 import { useAuth } from "../../../contexts/AuthContext";
 import { win95Border } from "../../../utils/styleUtils";
+// Import the missing hook
+import useGameNotifications from "../../../hooks/useGameNotifications";
 
 const LoginContainer = styled.div`
   display: flex;
@@ -113,8 +115,8 @@ const LoginForm = ({ onRegisterClick }) => {
   const { login, error } = useAuth();
   const navigate = useNavigate();
 
-  // Important: Call hooks at the top level, outside of any handlers
-  const gameNotifications = useGameNotifications();
+  // Initialize the hook at the top level, not inside event handlers
+  const { showWelcomeNotification } = useGameNotifications();
 
   /**
    * Handle form submission
@@ -140,12 +142,8 @@ const LoginForm = ({ onRegisterClick }) => {
       console.log("Attempting login with:", { email, password });
       const user = await login({ email, password });
 
-      // Show welcome notification - using the pre-initialized hook
+      // Show welcome notification
       try {
-        // Since we already initialized the hook at the top level,
-        // we can safely use its methods here
-        const { showWelcomeNotification } = gameNotifications;
-
         // Check if this is first login of the day
         const lastLogin = localStorage.getItem("last_login_date");
         const today = new Date().toDateString();

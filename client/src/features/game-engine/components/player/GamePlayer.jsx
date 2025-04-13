@@ -100,7 +100,7 @@ const GamePlayer = () => {
     }
   };
   
-  // Handle jumping to a specific turn
+  // Handle jump to turn in StoryPane
   const handleJumpToTurn = (turnIndex) => {
     // Convert from 1-based (UI) to 0-based (actual index)
     const index = turnIndex - 1;
@@ -109,13 +109,7 @@ const GamePlayer = () => {
     if (index >= 0 && index < segments.length) {
       setCurrentTurn(index);
       
-      // Scroll to the segment
-      if (scrollRef.current) {
-        const segmentElements = scrollRef.current.querySelectorAll('[data-segment-id]');
-        if (segmentElements[index]) {
-          segmentElements[index].scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }
+      // Let StoryPane handle the scrolling via its refs
     }
   };
   

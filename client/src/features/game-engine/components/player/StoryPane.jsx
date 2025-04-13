@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { win95Border } from '../../../../utils/styleUtils';
 import { placeholderIcons } from '../../../../utils/iconUtils';
+import { useGameStore } from '../../../../contexts/GameStoreContext';
 
 // Container for the entire story view
 const StoryContainer = styled.div`
@@ -360,6 +361,7 @@ const StoryPane = ({
             {segments.length > 3 && (
               <Timeline>
                 {segments.map((segment, index) => {
+                  console.log(segment);
                   const id = segment.id || index;
                   return (
                     <TimelineMarker 

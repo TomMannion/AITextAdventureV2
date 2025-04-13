@@ -1,93 +1,21 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+// Compatibility layer for GameFlowContext.jsx
+// This file ensures backward compatibility with components still importing from this path
 
-// Game flow states - define them here, not imported from GameStoreContext
-export const FLOW_STATES = {
-  LAUNCHER: 'launcher',   // Main menu
-  CREATOR: 'creator',     // Create new game
-  BROWSER: 'browser',     // Browse saved games
-  PLAYER: 'player',       // Play a game
-  COMPLETED: 'completed', // Game completion screen
-  ERROR: 'error',         // Error state
-};
+import { useGameStore, FLOW_STATES } from '../../../contexts/GameStoreContext';
 
-// Create context
-const GameFlowContext = createContext(null);
+// Re-export the FLOW_STATES
+export { FLOW_STATES };
 
-/**
- * Provider component for game flow state management
- */
-export const GameFlowProvider = ({ children }) => {
-  // Current flow state
-  const [flowState, setFlowState] = useState(FLOW_STATES.LAUNCHER);
-  
-  // Error state management
-  const [error, setError] = useState(null);
-  
-  // Navigation methods
-  const goToLauncher = useCallback(() => {
-    setFlowState(FLOW_STATES.LAUNCHER);
-    setError(null);
-  }, []);
-  
-  const goToCreator = useCallback(() => {
-    setFlowState(FLOW_STATES.CREATOR);
-    setError(null);
-  }, []);
-  
-  const goToBrowser = useCallback(() => {
-    setFlowState(FLOW_STATES.BROWSER);
-    setError(null);
-  }, []);
-  
-  const goToPlayer = useCallback(() => {
-    setFlowState(FLOW_STATES.PLAYER);
-    setError(null);
-  }, []);
-  
-  const goToCompleted = useCallback(() => {
-    setFlowState(FLOW_STATES.COMPLETED);
-    setError(null);
-  }, []);
-  
-  const goToError = useCallback((errorMessage) => {
-    setError(errorMessage);
-    setFlowState(FLOW_STATES.ERROR);
-  }, []);
-  
-  // Clear error
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
-  
-  // Context value
-  const value = {
-    flowState,
-    error,
-    goToLauncher,
-    goToCreator,
-    goToBrowser,
-    goToPlayer,
-    goToCompleted,
-    goToError,
-    clearError,
-  };
-  
-  return (
-    <GameFlowContext.Provider value={value}>
-      {children}
-    </GameFlowContext.Provider>
-  );
-};
-
-/**
- * Hook for accessing game flow context
- */
+// Create a compatibility hook that redirects to useGameStore
 export const useGameFlow = () => {
-  const context = useContext(GameFlowContext);
-  if (!context) {
-    throw new Error('useGameFlow must be used within a GameFlowProvider');
-  }
-  return context;
+  return useGameStore();
 };
 
-export default GameFlowContext;
+// Create empty provider for compatibility
+export const GameFlowProvider = ({ children }) => {
+  return children;
+};
+
+export default {
+  Provider: GameFlowProvider
+};
