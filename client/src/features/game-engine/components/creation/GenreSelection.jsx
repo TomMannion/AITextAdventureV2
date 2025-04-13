@@ -105,11 +105,11 @@ const genreData = {
     bgColor: '#f7e6ff',
     example: 'The detective\'s office is dimly lit as you examine the cryptic note left at the crime scene...',
   },
-  western: {
-    name: 'Western',
-    description: 'Experience the rugged frontier of the Wild West with gunslinging, gold mining, and outlaw chasing.',
-    bgColor: '#fff7e6',
-    example: 'The dusty saloon falls silent as you push through the swinging doors, spurs jingling...',
+  weird_west: {
+    name: 'Weird West',
+    description: 'Experience the supernatural frontier where cowboys battle eldritch horrors, shamans wield mysterious powers, and strange phenomena lurk in ghost towns.',
+    bgColor: '#8a795d',
+    example: 'The saloon falls silent as you enter, your silver revolver the only defense against the shapeshifter stalking the town...',
   },
 };
 

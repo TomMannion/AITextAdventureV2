@@ -6,7 +6,7 @@
  */
 export const placeholderIcons = {
   // System icons
-  windows: "/icons/windows-logo.ico",
+  windows: "/icons/startmenu.png",
   computer: "/icons/computer.ico",
   desktop: "/icons/desktop.ico",
   folder: "/icons/folder.ico",
@@ -61,11 +61,11 @@ export const placeholderIcons = {
   controlPanel: "/icons/control-panel.ico",
 
   // Game related icons
-  fantasy: "/icons/fantasy.ico",
-  scifi: "/icons/scifi.ico",
-  horror: "/icons/horror.ico",
-  mystery: "/icons/mystery.ico",
-  western: "/icons/western.ico",
+  fantasy: "/icons/genreIcons/fantasyIcon.png",
+  scifi: "/icons/genreIcons/scifiIcon.png",
+  horror: "/icons/genreIcons/horrorIcon.png",
+  mystery: "/icons/genreIcons/mysteryIcon.png",
+  weird_west: "/icons/genreIcons/weirdwestIcon.png",
 };
 
 /**
