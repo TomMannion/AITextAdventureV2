@@ -161,26 +161,21 @@ const GamePlayer = () => {
     }
   };
   
-  // When segments change, ensure we have matching player choices
-  useEffect(() => {
-    // If we have more segments than player choices, pad with empty choices
-    // This might happen when loading a saved game
-    if (segments.length > playerChoices.length + 1) {
-      const newChoices = [...playerChoices];
-      
-      // Add placeholder choices (minus 1 for the first segment which has no choice)
-      while (newChoices.length < segments.length - 1) {
-        newChoices.push('...');
-      }
-      
-      setPlayerChoices(newChoices);
-    }
+// When segments change, extract player choices from segment data
+useEffect(() => {
+  if (segments.length > 0) {
+    // Extract userChoice from all segments except the first
+    // The first segment doesn't have a preceding choice
+    const extractedChoices = segments
+      .slice(1) // Skip first segment
+      .map(segment => segment.userChoice || '...');
+    
+    setPlayerChoices(extractedChoices);
     
     // Update current turn to the latest when segments change
-    if (segments.length > 0) {
-      setCurrentTurn(segments.length - 1);
-    }
-  }, [segments, playerChoices]);
+    setCurrentTurn(segments.length - 1);
+  }
+}, [segments]);
   
   return (
     <PlayerContainer>

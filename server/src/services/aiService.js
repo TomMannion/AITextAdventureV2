@@ -443,17 +443,27 @@ class AiService {
     const providerConfig = config.ai.providers.groq;
 
     try {
-      // Create a fresh Groq instance for each request to prevent context contamination
-      const groq = new Groq({ apiKey });
+      // Create a fresh Groq instance with cache control headers
+      const groq = new Groq({ 
+        apiKey,
+        baseOptions: {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        }
+      });
 
       logger.debug(`Creating new Groq instance for request`);
 
       const response = await groq.chat.completions.create({
         model: modelId || providerConfig.defaultModel,
         messages,
-        temperature: temperature || config.ai.prompts.temperature,
+        temperature: Math.max(temperature || 0.7, 0.8), // Ensure higher temperature for variation
         max_tokens: maxTokens || config.ai.prompts.maxTokens,
         response_format: { type: "json_object" },
+        user: `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`, // Unique user ID
+        store: false // Explicitly disable caching
       });
 
       const content = response.choices[0].message.content;

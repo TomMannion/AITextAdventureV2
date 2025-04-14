@@ -393,7 +393,7 @@ const StoryPane = ({
                         <img src={placeholderIcons.user} alt="Player" />
                       </ChoiceIcon>
                       <ChoiceText>
-                        {playerChoice.text || playerChoice}
+                        {typeof playerChoice === 'object' ? playerChoice.text : playerChoice}
                       </ChoiceText>
                     </PlayerChoiceContainer>
                   )}

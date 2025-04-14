@@ -1,5 +1,5 @@
 import express from "express";
-import * as optionController from "../controllers/optionController.js";
+import * as optionController from "../controllers/simplifiedOptionController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { catchAsync } from "../middleware/errorMiddleware.js";
 import { validateIdParam } from "../middleware/validateRequest.js";

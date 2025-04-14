@@ -14,6 +14,7 @@ class SimplifiedStoryService {
    */
   async generateInitialStory(gameId, aiOptions) {
     console.log(aiOptions);
+    
     try {
       // Get the game data
       const game = await gameService.getGameById(gameId);
@@ -42,7 +43,7 @@ class SimplifiedStoryService {
       // Get response from AI service
       const initialStoryResponse = await aiService.generateJSON(aiOptions, {
         messages: initialStoryPrompt,
-        temperature: 0.7,
+        temperature: 0.8,
         maxTokens: 2000,
       });
 
@@ -54,6 +55,9 @@ class SimplifiedStoryService {
       }
 
       logger.debug(`Generated initial story for game ${gameId}`);
+
+      console.log("Full AI prompt sent:", JSON.stringify(initialStoryPrompt));
+      console.log("Full AI response received:", JSON.stringify(initialStoryResponse));
 
       // Update the game with the initial story
       await gameService.updateGameWithInitialStory(gameId, content);

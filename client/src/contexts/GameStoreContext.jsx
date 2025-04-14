@@ -644,33 +644,45 @@ export const GameStoreProvider = ({ children }) => {
     ]
   );
 
-  // Submit choice
   const submitChoice = useCallback(
     async (optionId = null, customText = null) => {
       if (!state.currentGame) {
         setError("No active game found");
         return null;
       }
-
+  
       if (!state.apiKey) {
         setError("API key is required for story progression");
         return null;
       }
-
+  
       // Validate that we have either an option ID or custom text
       if (!optionId && (!customText || !customText.trim())) {
         showError("Please select an option or enter your own action");
         return null;
       }
-
+  
       try {
         setLoading(true, "Processing your choice...");
-
+  
+        // Mark option as chosen FIRST, before generating the next segment
+        if (optionId && state.currentSegment?.id) {
+          console.log(`Attempting to mark option ${optionId} as chosen for segment ${state.currentSegment.id}`);
+          try {
+            // This is a separate try/catch to ensure we continue even if this fails
+            const chooseResult = await gameService.chooseOption(state.currentSegment.id, optionId);
+            console.log("Choose option result:", chooseResult);
+          } catch (chooseError) {
+            // Log but continue - this isn't critical
+            console.warn("Failed to mark option as chosen:", chooseError);
+          }
+        }
+  
         // Log the player's choice
         const choiceText = optionId
           ? state.options.find((opt) => opt.id === optionId)?.text
           : customText;
-
+  
         if (choiceText) {
           dispatch({
             type: ACTIONS.ADD_LOG,
@@ -680,26 +692,27 @@ export const GameStoreProvider = ({ children }) => {
             },
           });
         }
-
-        // Prepare the choice data
+  
+        // Prepare the choice data for story generation
         const choiceData = optionId
           ? { optionId }
           : { customText: customText.trim() };
-
+  
         // Call the API to create the next story segment
         const response = await gameService.createStorySegment(
           state.currentGame.id,
           choiceData,
           state.apiKey
         );
-
+  
+        // Rest of existing code...
         console.log("Story progression response:", response);
-
+  
         // Extract data based on API response structure
         const gameUpdate = response.game || {};
         const newSegment = response.segment || response;
         const newOptions = response.options || newSegment?.options || [];
-
+  
         // Update the current game with turn count
         if (state.currentGame) {
           const newTurnCount = (state.currentGame.turnCount || 0) + 1;
@@ -708,9 +721,9 @@ export const GameStoreProvider = ({ children }) => {
             ...gameUpdate,
             turnCount: newTurnCount,
           };
-
+  
           setCurrentGame(updatedGame);
-
+  
           // Check if game is completed
           if (
             updatedGame.status === "COMPLETED" ||
@@ -719,11 +732,11 @@ export const GameStoreProvider = ({ children }) => {
             goToCompleted();
           }
         }
-
+  
         // Process and set the new segment and options
         if (newSegment) {
           dispatch({ type: ACTIONS.ADD_SEGMENT, payload: newSegment });
-
+  
           // Add log entry for the new segment
           dispatch({
             type: ACTIONS.ADD_LOG,
@@ -733,15 +746,15 @@ export const GameStoreProvider = ({ children }) => {
             },
           });
         }
-
+  
         if (newOptions.length > 0) {
           dispatch({ type: ACTIONS.SET_OPTIONS, payload: newOptions });
         }
-
+  
         // Reset selected option
         dispatch({ type: ACTIONS.SET_SELECTED_OPTION, payload: null });
         dispatch({ type: ACTIONS.SET_CUSTOM_OPTION, payload: "" });
-
+  
         return {
           segment: newSegment,
           options: newOptions,
@@ -758,6 +771,7 @@ export const GameStoreProvider = ({ children }) => {
       state.currentGame,
       state.apiKey,
       state.options,
+      state.currentSegment,
       setLoading,
       setError,
       setCurrentGame,

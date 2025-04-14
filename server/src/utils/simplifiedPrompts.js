@@ -10,14 +10,20 @@ const simplifiedPrompts = {
    * @returns {Array} Array of message objects for AI
    */
   initialStory: (genre) => {
+    const uniqueId = `uid_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     return [
       {
         role: "system",
-        content: `You are creating a literary-quality ${genre} story that will serve as the foundation for an interactive narrative experience.`,
+        content: `You are a professional storyteller. You are creating a ${genre} story in the style of a nosleep style story.`,
       },
       {
         role: "user",
-        content: `Write a complete ${genre} story of approximately 500 words. Create an engaging protagonist in a specific situation with clear motivations.
+        content: `uniqueId: ${uniqueId}
+        
+        Please write a nosleep style ${genre} story of approximately 500 words. The story should avoid common tropes and cliches.
+        The should explore themes in the ${genre} genre that are not often explored. try to think of something unique and interesting.
+
+        
 
         Your response MUST be in JSON format with the following schema:
         {
@@ -39,15 +45,15 @@ const simplifiedPrompts = {
     return [
       {
         role: "system",
-        content: `You are creating the first chapter of an interactive ${genre} narrative based on an existing story.`,
+        content: `You are creating the first chapter of an turn based nosleep style ${genre} story.`,
       },
       {
         role: "user",
-        content: `Here is the initial story:
+        content: `Here is the rough outline of the story:
 
         ${initialStory}
 
-        Write the first chapter (200-300 words) that builds on this story. At the end, provide 2-3 possible paths for the protagonist to take.
+        Write the first chapter (200-300 words) of a turn based nosleep style ${genre} story that follows the outline and style of this story. At the end, provide 2-3 possible choices for the protagonist to take.
 
         Your response MUST be in JSON format:
         {
@@ -80,11 +86,11 @@ const simplifiedPrompts = {
     return [
       {
         role: "system",
-        content: `You are continuing an interactive ${genre} narrative based on previous chapters and the player's choice.`,
+        content: `You are continuing a turn based nosleep style ${genre} story based on previous chapters and the player's choice.`,
       },
       {
         role: "user",
-        content: `Initial story:
+        content: `Outline of the story:
         ${initialStory}
 
         Previous chapters:
@@ -92,7 +98,7 @@ const simplifiedPrompts = {
 
         The player chose: "${userChoice}"
 
-        Write the next chapter (200-300 words) that continues the story based on this choice. At the end, provide 2-3 possible paths for the protagonist to take.
+        Write the next chapter (200-300 words) of a turn based nosleep style ${genre} story that continues the story based on the players choice, and previous chapters and taking into account the outline of the story. At the end, provide 2-3 possible paths for the protagonist to take.
 
         Your response MUST be in JSON format:
         {

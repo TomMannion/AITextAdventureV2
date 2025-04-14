@@ -413,23 +413,22 @@ const gameService = {
    */
   chooseOption: async (segmentId, optionId) => {
     try {
-      const segId =
-        typeof segmentId === "string" ? parseInt(segmentId, 10) : segmentId;
-      const optId =
-        typeof optionId === "string" ? parseInt(optionId, 10) : optionId;
-
-      console.log(`Choosing option ${optId} for segment ${segId}`);
-
-      const response = await apiClient.post(
-        `/options/segments/${segId}/options/${optId}/choose`
-      );
-
-      return response.data || response;
+      const segId = typeof segmentId === "string" ? parseInt(segmentId, 10) : segmentId;
+      const optId = typeof optionId === "string" ? parseInt(optionId, 10) : optionId;
+  
+      console.log(`Marking option ${optId} as chosen for segment ${segId}`);
+      
+      // Full logging for debugging
+      const url = `/options/segments/${segId}/options/${optId}/choose`;
+      console.log(`Sending POST request to: ${url}`);
+  
+      const response = await apiClient.post(url);
+      console.log(`Option marked as chosen successfully:`, response);
+      return response;
     } catch (error) {
-      console.error(
-        `Error choosing option ${optionId} for segment ${segmentId}:`,
-        error
-      );
+      console.error(`Error marking option ${optionId} as chosen:`, error);
+      // Show full error details for easier debugging
+      console.error(`Error details:`, error.response?.data || error.message);
       throw error;
     }
   },
