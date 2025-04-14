@@ -1,6 +1,6 @@
 import prisma from "../models/index.js";
 import aiService from "./aiService.js";
-import gameService from "./gameService.js";
+import gameService from "./simplifiedGameService.js";
 import simplifiedPrompts from "../utils/simplifiedPrompts.js";
 import { ApiError } from "../middleware/errorMiddleware.js";
 import logger from "../utils/logger.js";

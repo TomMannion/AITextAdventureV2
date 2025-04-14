@@ -1,5 +1,5 @@
 import express from "express";
-import * as storyController from "../controllers/storyController.js";
+import * as storyController from "../controllers/simplifiedStoryController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { catchAsync } from "../middleware/errorMiddleware.js";
 import {

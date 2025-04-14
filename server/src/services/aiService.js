@@ -435,75 +435,113 @@ class AiService {
   }
 
   /**
-   * Generate JSON using Groq SDK
+   * Generate JSON using Groq SDK, explicitly adding a unique random seed per request.
    */
   async generateJSONWithGroq(options, promptData) {
     const { apiKey, modelId } = options;
-    const { messages, temperature, maxTokens } = promptData;
+    const { messages, temperature, maxTokens } = promptData; // Assuming temperature is still passed, though seed has strong effect
     const providerConfig = config.ai.providers.groq;
 
     try {
       // Create a fresh Groq instance with cache control headers
-      const groq = new Groq({ 
+      const groq = new Groq({
         apiKey,
         baseOptions: {
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache'
+            'Pragma': 'no-cache',
+            'Expires': '0'
           }
         }
       });
 
       logger.debug(`Creating new Groq instance for request`);
 
-      const response = await groq.chat.completions.create({
+      // --- *** NEW: Generate a unique random seed for this specific request *** ---
+      // Using a large integer range.
+      const randomSeed = Math.floor(Math.random() * 2147483647); // Max safe integer is large enough
+      logger.debug(`Using generated random seed for Groq request: ${randomSeed}`);
+      // --- *** END NEW *** ---
+
+      // Determine effective temperature (might have less impact when seed is set, but good to keep)
+      const effectiveTemperature = Math.max(temperature || 0.8, 0.1); // Allow lower temp if specified, default 0.8
+      // Add penalties if desired (can be used with seed)
+      const presencePenalty = 0.1;
+      const frequencyPenalty = 0.1;
+
+
+      // Construct the API payload, now including the seed
+      const apiPayload = {
         model: modelId || providerConfig.defaultModel,
-        messages,
-        temperature: Math.max(temperature || 0.7, 0.8), // Ensure higher temperature for variation
+        messages, // CRITICAL: Ensure this array is correct and fresh for each NEW story request!
+        temperature: effectiveTemperature,
         max_tokens: maxTokens || config.ai.prompts.maxTokens,
         response_format: { type: "json_object" },
-        user: `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`, // Unique user ID
-        store: false // Explicitly disable caching
+        user: `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`, // Unique user ID is good
+        presence_penalty: presencePenalty,
+        frequency_penalty: frequencyPenalty,
+        // --- *** NEW: Add the seed parameter to the payload *** ---
+        seed: randomSeed,
+        // --- *** END NEW *** ---
+      };
+
+      // Log the payload being sent, *including the seed*
+      promptLogger.info("Sending request to Groq with explicit seed", {
+         model: apiPayload.model,
+         temperature: apiPayload.temperature,
+         seed: apiPayload.seed, // Log the seed value
+         presence_penalty: apiPayload.presence_penalty,
+         frequency_penalty: apiPayload.frequency_penalty,
+         user: apiPayload.user,
+         messageCount: apiPayload.messages.length
       });
+
+      const response = await groq.chat.completions.create(apiPayload);
 
       const content = response.choices[0].message.content;
 
+      // Attempt to parse the JSON, with fallback fixing logic
       try {
-        // Try standard JSON parse first
         return JSON.parse(content);
       } catch (error) {
-        // If that fails, use our fallback parser
-        logger.warn("Groq returned invalid JSON, attempting to fix");
-        const fixedJson = this.fixAndParseJSON(content);
+        logger.warn("Groq returned potentially invalid JSON with seed, attempting to fix", { rawContent: content, seedUsed: randomSeed });
+        const fixedJson = this.fixAndParseJSON(content); // Use your existing fixer
 
         if (fixedJson) {
+          logger.info("Successfully parsed JSON after applying fixes (seed used).");
           return fixedJson;
         } else {
-          throw new Error("Unable to parse JSON response from Groq");
+           logger.error("Unable to parse JSON response from Groq even after attempting fixes (seed used).", { rawContent: content, seedUsed: randomSeed });
+          throw new Error("Unable to parse JSON response from Groq after attempting fixes (seed used).");
         }
       }
     } catch (error) {
-      // If it's a Groq error with failed_generation, try to salvage the content
+      // Handle specific Groq JSON validation failure where content might be salvaged
       if (
         error.response &&
         error.response.data &&
         error.response.data.error &&
-        error.response.data.error.failed_generation
+        error.response.data.error.failed_generation // Check for Groq's specific error structure
       ) {
         logger.warn(
-          "Groq JSON validation failed, attempting to fix failed_generation"
+          "Groq API indicated JSON generation failure with seed, attempting to parse 'failed_generation' content",
+          { errorDetails: error.response.data.error, seedUsed: randomSeed } // Log seed here too if possible
         );
-        const fixedJson = this.fixAndParseJSON(
-          error.response.data.error.failed_generation
-        );
+        const failedGenerationContent = error.response.data.error.failed_generation;
+        const fixedJson = this.fixAndParseJSON(failedGenerationContent);
 
         if (fixedJson) {
+           logger.info("Successfully parsed JSON from 'failed_generation' content after applying fixes (seed used).");
           return fixedJson;
+        } else {
+           logger.error("Failed to parse even the 'failed_generation' content (seed used).", { rawFailedContent: failedGenerationContent, seedUsed: randomSeed });
+           error.message = `Groq JSON generation failed (seed used) and fallback parsing failed: ${error.message}`;
         }
       }
 
-      // Otherwise handle the error normally
+      // Use your existing general SDK error handler
       this.handleSdkError(error, "Groq");
+      throw error; // Re-throw the error after handling/logging if handleSdkError doesn't throw
     }
   }
 

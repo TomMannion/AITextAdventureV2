@@ -1,6 +1,6 @@
 import prisma from "../models/index.js";
 import aiService from "../services/aiService.js";
-import gameService from "../services/gameService.js";
+import gameService from "../services/simplifiedGameService.js";
 import { ApiError } from "../middleware/errorMiddleware.js";
 
 /**
@@ -62,7 +62,7 @@ export const generateStoryTitle = async (req, res, next) => {
 
     // Get the game
     const game = await gameService.getGameById(parseInt(gameId, 10), userId);
-
+    console.log("game", game);
     // Get AI options from request
     const options = {
       provider:

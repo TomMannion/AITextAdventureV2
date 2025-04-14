@@ -13,10 +13,6 @@ const simplifiedPrompts = {
     const uniqueId = `uid_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     return [
       {
-        role: "system",
-        content: `You are a professional storyteller. You are creating a ${genre} story in the style of a nosleep style story.`,
-      },
-      {
         role: "user",
         content: `uniqueId: ${uniqueId}
         

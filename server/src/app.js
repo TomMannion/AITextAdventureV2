@@ -8,7 +8,6 @@ import { sanitizeInput } from "./middleware/validateRequest.js";
 import config from "./config/index.js";
 
 // Import routes
-import routes from "./routes/index.js";
 import simplifiedRoutes from "./routes/simplifiedRoutes.js";
 
 // Initialize express app
